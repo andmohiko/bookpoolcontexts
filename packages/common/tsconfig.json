@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    // 変換は“消費側”が行うので、TSは型チェック専用
+    "noEmit": true,
+    "isolatedModules": true,
+    // モダン＆バンドラ前提の解決に合わせる
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2022",
+    // import/export をそのまま残し、型だけ除去
+    "verbatimModuleSyntax": true,
+    // パスの設定
+    "baseUrl": "./",
+    "paths": {
+      "~/*": ["./src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
+}
