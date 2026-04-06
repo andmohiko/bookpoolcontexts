@@ -2,9 +2,6 @@
   "name": "@vectornote/web",
   "private": true,
   "type": "module",
-  "imports": {
-    "@/*": "./src/*"
-  },
   "scripts": {
     "dev": "NODE_OPTIONS='--max-http-header-size=32768' vite dev --port 3000",
     "build": "vite build",
