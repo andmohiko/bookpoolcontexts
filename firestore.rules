@@ -1,0 +1,79 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 送られてきたリクエストのデータ
+    function requestData() {
+      return request.resource.data;
+    }
+
+    // ログイン済かどうか
+    function isSignedIn() {
+      return request.auth.uid != null;
+    }
+
+    // ユーザーIDが一致するかどうか
+    function isUser(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // User のスキーマバリデーション
+    function isValidUserSchema(requestData) {
+      return requestData.size() == 3
+        && 'createdAt' in requestData && requestData.createdAt is timestamp
+        && 'email' in requestData && requestData.email is string
+        && 'updatedAt' in requestData && requestData.updatedAt is timestamp;
+    }
+
+    // Note のスキーマバリデーション
+    function isValidNoteSchema(requestData) {
+      return requestData.size() == 10
+        && 'createdAt' in requestData && requestData.createdAt is timestamp
+        && 'updatedAt' in requestData && requestData.updatedAt is timestamp
+        && 'updatedBy' in requestData && requestData.updatedBy is string
+        && 'content' in requestData && requestData.content is string
+        && 'embedding' in requestData
+        && 'isPinned' in requestData && requestData.isPinned is bool
+        && 'ogp' in requestData && (requestData.ogp is map || requestData.ogp == null)
+        && 'keywords' in requestData && requestData.keywords is string
+        && 'tags' in requestData && requestData.tags is list
+        && 'title' in requestData && (requestData.title is string || requestData.title == null);
+    }
+
+    // Template のスキーマバリデーション
+    function isValidTemplateSchema(requestData) {
+      return requestData.size() == 7
+        && 'body' in requestData && requestData.body is string
+        && 'createdAt' in requestData && requestData.createdAt is timestamp
+        && 'defaultKeyword' in requestData && requestData.defaultKeyword is string
+        && 'defaultTags' in requestData && requestData.defaultTags is list
+        && 'defaultTitle' in requestData && requestData.defaultTitle is string
+        && 'name' in requestData && requestData.name is string
+        && 'updatedAt' in requestData && requestData.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && isUser(userId);
+      allow create: if isSignedIn() && isUser(userId) && isValidUserSchema(requestData());
+      allow update: if isSignedIn() && isUser(userId) && isValidUserSchema(requestData());
+
+      match /notes/{noteId} {
+        allow read: if isSignedIn() && isUser(userId);
+        allow create: if isSignedIn() && isUser(userId) && isValidNoteSchema(requestData());
+        allow update: if isSignedIn() && isUser(userId) && isValidNoteSchema(requestData());
+        allow delete: if isSignedIn() && isUser(userId);
+      }
+
+      match /tags/{tagId} {
+        allow read: if isSignedIn() && isUser(userId);
+      }
+
+      match /templates/{templateId} {
+        allow read: if isSignedIn() && isUser(userId);
+        allow create: if isSignedIn() && isUser(userId) && isValidTemplateSchema(requestData());
+        allow update: if isSignedIn() && isUser(userId) && isValidTemplateSchema(requestData());
+        allow delete: if isSignedIn() && isUser(userId);
+      }
+    }
+  }
+}

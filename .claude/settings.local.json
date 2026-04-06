@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:tanstack.com)",
+      "WebSearch",
+      "Bash(npx tsc:*)",
+      "Bash(npx -w apps/web tsc --noEmit)",
+      "Bash(ls node_modules/.bin/tsc*)",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(pnpm --filter web build)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:firebase.google.com)",
+      "Bash(pnpm --filter @vectornote/functions tsc --noEmit)",
+      "Bash(pnpm --filter @vectornote/web tsc --noEmit)",
+      "Bash(firebase firestore:indexes)",
+      "Bash(pnpm web build)",
+      "Bash(pnpm functions pre-build)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
