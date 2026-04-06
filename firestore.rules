@@ -25,30 +25,30 @@ service cloud.firestore {
         && 'updatedAt' in requestData && requestData.updatedAt is timestamp;
     }
 
-    // Note のスキーマバリデーション
-    function isValidNoteSchema(requestData) {
-      return requestData.size() == 10
+    // Book のスキーマバリデーション
+    function isValidBookSchema(requestData) {
+      return requestData.size() == 13
+        && 'author' in requestData && requestData.author is string
+        && 'coverImageUrl' in requestData && requestData.coverImageUrl is string
         && 'createdAt' in requestData && requestData.createdAt is timestamp
-        && 'updatedAt' in requestData && requestData.updatedAt is timestamp
-        && 'updatedBy' in requestData && requestData.updatedBy is string
-        && 'content' in requestData && requestData.content is string
-        && 'embedding' in requestData
-        && 'isPinned' in requestData && requestData.isPinned is bool
-        && 'ogp' in requestData && (requestData.ogp is map || requestData.ogp == null)
-        && 'keywords' in requestData && requestData.keywords is string
+        && 'foundBy' in requestData && requestData.foundBy is string
+        && 'groups' in requestData && requestData.groups is list
+        && 'isRead' in requestData && requestData.isRead is bool
+        && 'location' in requestData && requestData.location is string
+        && 'note' in requestData && requestData.note is string
+        && 'pages' in requestData && requestData.pages is number
+        && 'purchasedBy' in requestData && requestData.purchasedBy is list
         && 'tags' in requestData && requestData.tags is list
-        && 'title' in requestData && (requestData.title is string || requestData.title == null);
+        && 'title' in requestData && requestData.title is string
+        && 'updatedAt' in requestData && requestData.updatedAt is timestamp;
     }
 
-    // Template のスキーマバリデーション
-    function isValidTemplateSchema(requestData) {
-      return requestData.size() == 7
-        && 'body' in requestData && requestData.body is string
+    // Group のスキーマバリデーション
+    function isValidGroupSchema(requestData) {
+      return requestData.size() == 4
+        && 'count' in requestData && requestData.count is number
         && 'createdAt' in requestData && requestData.createdAt is timestamp
-        && 'defaultKeyword' in requestData && requestData.defaultKeyword is string
-        && 'defaultTags' in requestData && requestData.defaultTags is list
-        && 'defaultTitle' in requestData && requestData.defaultTitle is string
-        && 'name' in requestData && requestData.name is string
+        && 'label' in requestData && requestData.label is string
         && 'updatedAt' in requestData && requestData.updatedAt is timestamp;
     }
 
@@ -57,22 +57,22 @@ service cloud.firestore {
       allow create: if isSignedIn() && isUser(userId) && isValidUserSchema(requestData());
       allow update: if isSignedIn() && isUser(userId) && isValidUserSchema(requestData());
 
-      match /notes/{noteId} {
+      match /books/{bookId} {
         allow read: if isSignedIn() && isUser(userId);
-        allow create: if isSignedIn() && isUser(userId) && isValidNoteSchema(requestData());
-        allow update: if isSignedIn() && isUser(userId) && isValidNoteSchema(requestData());
+        allow create: if isSignedIn() && isUser(userId) && isValidBookSchema(requestData());
+        allow update: if isSignedIn() && isUser(userId) && isValidBookSchema(requestData());
+        allow delete: if isSignedIn() && isUser(userId);
+      }
+
+      match /groups/{groupId} {
+        allow read: if isSignedIn() && isUser(userId);
+        allow create: if isSignedIn() && isUser(userId) && isValidGroupSchema(requestData());
+        allow update: if isSignedIn() && isUser(userId) && isValidGroupSchema(requestData());
         allow delete: if isSignedIn() && isUser(userId);
       }
 
       match /tags/{tagId} {
         allow read: if isSignedIn() && isUser(userId);
-      }
-
-      match /templates/{templateId} {
-        allow read: if isSignedIn() && isUser(userId);
-        allow create: if isSignedIn() && isUser(userId) && isValidTemplateSchema(requestData());
-        allow update: if isSignedIn() && isUser(userId) && isValidTemplateSchema(requestData());
-        allow delete: if isSignedIn() && isUser(userId);
       }
     }
   }
