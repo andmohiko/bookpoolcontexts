@@ -10,7 +10,8 @@ export type BookId = string
 /** Entity型（Firestoreから取得したデータ、Date変換済み） */
 export type Book = {
   bookId: BookId
-  author: string
+  amazonUrl: string
+  author: string | null
   coverImageUrl: string
   createdAt: Date
   foundBy: string
@@ -18,7 +19,7 @@ export type Book = {
   isRead: boolean
   location: string
   note: string
-  pages: number
+  pages: number | null
   purchasedBy: string[]
   tags: string[]
   title: string
@@ -33,6 +34,7 @@ export type CreateBookDto = Omit<Book, 'bookId' | 'createdAt' | 'updatedAt'> & {
 
 /** 更新用DTO */
 export type UpdateBookDto = {
+  amazonUrl?: Book['amazonUrl']
   author?: Book['author']
   coverImageUrl?: Book['coverImageUrl']
   foundBy?: Book['foundBy']
@@ -49,6 +51,7 @@ export type UpdateBookDto = {
 
 /** firebase-admin を使用した更新用DTO（Amazon情報取得時） */
 export type UpdateBookDtoFromAdmin = {
+  amazonUrl?: Book['amazonUrl']
   author?: Book['author']
   coverImageUrl?: Book['coverImageUrl']
   pages?: Book['pages']
