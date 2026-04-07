@@ -4,8 +4,8 @@ import type {
   CreateBookDto,
   Uid,
   UpdateBookDto,
-} from '@vectornote/common'
-import { bookCollection, userCollection } from '@vectornote/common'
+} from '@bookpoolcontexts/common'
+import { bookCollection, userCollection } from '@bookpoolcontexts/common'
 import type { DocumentSnapshot, Unsubscribe } from 'firebase/firestore'
 import {
   addDoc,

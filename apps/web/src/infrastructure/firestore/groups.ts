@@ -4,8 +4,8 @@ import type {
   GroupId,
   Uid,
   UpdateGroupDto,
-} from '@vectornote/common'
-import { groupCollection, userCollection } from '@vectornote/common'
+} from '@bookpoolcontexts/common'
+import { groupCollection, userCollection } from '@bookpoolcontexts/common'
 import type { Unsubscribe } from 'firebase/firestore'
 import {
   addDoc,

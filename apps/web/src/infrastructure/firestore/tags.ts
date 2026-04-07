@@ -1,5 +1,5 @@
-import type { Tag, Uid } from '@vectornote/common'
-import { tagCollection, userCollection } from '@vectornote/common'
+import type { Tag, Uid } from '@bookpoolcontexts/common'
+import { tagCollection, userCollection } from '@bookpoolcontexts/common'
 import type { Unsubscribe } from 'firebase/firestore'
 import {
   collection,
