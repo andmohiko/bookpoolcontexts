@@ -37,9 +37,9 @@
 
 | type | name                                                                | description 　　　　　　                    | default port |
 | ---- | ------------------------------------------------------------------- | ------------------------------------------- | ------------ |
-| app  | [@vectornote/web](./apps/web/)                              | Web アプリ本体                              | ---          |
-| app  | [@vectornote/functions](./apps/functions/)                  | Cloud Functions                             | ---          |
-| pkg  | [@vectornote/common](./packages/common/)                    | 共通で使用する型定義など                     | ---          |
+| app  | [@bookpoolcontexts/web](./apps/web/)                              | Web アプリ本体                              | ---          |
+| app  | [@bookpoolcontexts/functions](./apps/functions/)                  | Cloud Functions                             | ---          |
+| pkg  | [@bookpoolcontexts/common](./packages/common/)                    | 共通で使用する型定義など                     | ---          |
 
 ## 環境構築
 

@@ -27,8 +27,9 @@ service cloud.firestore {
 
     // Book のスキーマバリデーション
     function isValidBookSchema(requestData) {
-      return requestData.size() == 13
-        && 'author' in requestData && requestData.author is string
+      return requestData.size() == 14
+        && 'amazonUrl' in requestData && requestData.amazonUrl is string
+        && 'author' in requestData && (requestData.author is string || requestData.author == null)
         && 'coverImageUrl' in requestData && requestData.coverImageUrl is string
         && 'createdAt' in requestData && requestData.createdAt is timestamp
         && 'foundBy' in requestData && requestData.foundBy is string
@@ -36,7 +37,7 @@ service cloud.firestore {
         && 'isRead' in requestData && requestData.isRead is bool
         && 'location' in requestData && requestData.location is string
         && 'note' in requestData && requestData.note is string
-        && 'pages' in requestData && requestData.pages is number
+        && 'pages' in requestData && (requestData.pages is number || requestData.pages == null)
         && 'purchasedBy' in requestData && requestData.purchasedBy is list
         && 'tags' in requestData && requestData.tags is list
         && 'title' in requestData && requestData.title is string

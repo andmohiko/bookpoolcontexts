@@ -43,7 +43,7 @@ const config = defineConfig({
   ],
   resolve: {
     alias: {
-      '@vectornote/common': path.resolve(__dirname, '../../packages/common/src')
+      '@bookpoolcontexts/common': path.resolve(__dirname, '../../packages/common/src')
     }
   }
 })

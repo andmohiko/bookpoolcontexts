@@ -10,8 +10,8 @@
       "Bash(pnpm --filter web build)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:firebase.google.com)",
-      "Bash(pnpm --filter @vectornote/functions tsc --noEmit)",
-      "Bash(pnpm --filter @vectornote/web tsc --noEmit)",
+      "Bash(pnpm --filter @bookpoolcontexts/functions tsc --noEmit)",
+      "Bash(pnpm --filter @bookpoolcontexts/web tsc --noEmit)",
       "Bash(firebase firestore:indexes)",
       "Bash(pnpm web build)",
       "Bash(pnpm functions pre-build)"
