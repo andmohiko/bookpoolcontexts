@@ -1,4 +1,4 @@
-# 📚 BookGroups 要件定義書
+# 📚 BookPoolContexts 要件定義書
 
 **読みたい本の管理アプリケーション**
 
@@ -16,7 +16,7 @@
 
 | 項目 | 内容 |
 |------|------|
-| プロジェクト名 | BookGroups |
+| プロジェクト名 | BookPoolContexts |
 | 開発期間 | Phase 1: 4週間（MVP） |
 | 対象ユーザー | 読書好きな個人ユーザー |
 | プラットフォーム | Webアプリケーション（SPA、レスポンシブ対応） |
@@ -79,9 +79,10 @@
 | フィールド名 | 必須/任意 | データ型 | バリデーション |
 |-------------|----------|---------|---------------|
 | タイトル (title) | **必須** | string | 1文字以上、200文字以下 |
-| 著者 (author) | **必須** | string | 1文字以上、100文字以下 |
+| 著者 (author) | 自動取得 | string \| null | Cloud Functionsが自動取得。登録時はnull |
 | 表紙画像URL (coverImageUrl) | 任意 | string | 有効なURL形式 |
-| ページ数 (pages) | 任意 | number | 1以上、99999以下 |
+| ページ数 (pages) | 自動取得 | number \| null | Cloud Functionsが自動取得。登録時はnull |
+| AmazonURL (amazonUrl) | 自動設定 | string | Amazon検索結果から自動設定 |
 | タグ (tags) | 任意 | string[] | 各タグ50文字以下、最大10個 |
 | どこで見つけたか (foundBy) | 任意 | string | 500文字以下 |
 | どこで読めるか (location) | 任意 | string | 200文字以下 |
@@ -92,22 +93,25 @@
 **処理フロー:**
 1. ユーザーがフォームに入力
 2. クライアント側でZodによるバリデーション
-3. Firestoreに本のデータを保存
+3. Firestoreに本のデータを保存（author: null, pages: null, amazonUrl付き）
 4. タグ・グループのカウントを更新
 5. 成功後、一覧画面へ遷移
+6. Cloud Functions（onCreateBook トリガー）がamazonUrlからAmazon詳細ページをスクレイピングし、著者名・ページ数を自動取得してFirestoreを更新
 
-#### FR-BOOK-002: Amazon情報からの取得
+#### FR-BOOK-002: Amazon情報からの自動取得
 
 | 項目 | 内容 |
 |------|------|
-| 概要 | AmazonのURLから本の情報を自動取得する機能 |
+| 概要 | 本の登録時にAmazon詳細ページから著者名・ページ数を自動取得する機能 |
 | 優先度 | 中 |
 
 **詳細要件:**
-- AmazonのURLを入力すると、表紙画像URL、タイトル、著者、ページ数を自動取得する
-- 取得した情報はフォームに自動入力される
-- ユーザーは取得後に各フィールドを編集可能
-- 情報取得はFirebase Functions経由で実行する
+- Amazon検索結果から本を選択・登録すると、ASINからAmazon詳細ページURLを自動生成しBookドキュメントに保存する
+- Cloud Functions の onCreateBook トリガーが、保存された amazonUrl を使ってAmazon詳細ページをスクレイピングする
+- 著者名（author）とページ数（pages）を自動取得し、Firestoreの該当Bookドキュメントを更新する
+- 取得できなかった場合はnullのまま維持する（エラーにはしない）
+- スクレイピングにはpuppeteer-core + @sparticuz/chromiumを使用する
+- 情報取得はFirebase Functions（Firestoreトリガー）経由で実行する
 
 #### FR-BOOK-003: 本の編集
 
@@ -318,7 +322,8 @@ firestore/
 │       ├── updatedAt: Timestamp
 │       ├── books/  (サブコレクション)
 │       │   └── {bookId}/
-│       │       ├── author: string
+│       │       ├── amazonUrl: string
+│       │       ├── author: string | null
 │       │       ├── coverImageUrl: string
 │       │       ├── createdAt: Timestamp
 │       │       ├── foundBy: string
@@ -326,7 +331,7 @@ firestore/
 │       │       ├── isRead: boolean
 │       │       ├── location: string
 │       │       ├── note: string
-│       │       ├── pages: number
+│       │       ├── pages: number | null
 │       │       ├── purchasedBy: string[]
 │       │       ├── tags: string[]
 │       │       ├── title: string
@@ -359,7 +364,8 @@ firestore/
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
 | id | string | 自動生成ID（ドキュメントID） |
-| author | string | 本の著者 |
+| amazonUrl | string | Amazon詳細ページのURL（ASINから自動生成） |
+| author | string \| null | 本の著者（Cloud Functionsが自動取得、初期値null） |
 | coverImageUrl | string | 表紙の画像URL |
 | createdAt | Timestamp | 登録日時 |
 | foundBy | string | どこで見つけたか（誰に勧められたかなど） |
@@ -367,7 +373,7 @@ firestore/
 | isRead | boolean | 読了かどうか |
 | location | string | どこで読めるか（図書館、ブックオフ、本屋、Kindle Unlimitedなど） |
 | note | string | 自由記述のメモ |
-| pages | number | ページ数 |
+| pages | number \| null | ページ数（Cloud Functionsが自動取得、初期値null） |
 | purchasedBy | string[] | 購入場所（物理本、Kindle、オフィス） |
 | tags | string[] | ジャンルタグ |
 | title | string | 本のタイトル |
@@ -401,7 +407,8 @@ import { Timestamp } from 'firebase/firestore';
 
 export interface Book {
   id: string;
-  author: string;
+  amazonUrl: string;
+  author: string | null;
   coverImageUrl: string;
   createdAt: Timestamp;
   foundBy: string;
@@ -409,7 +416,7 @@ export interface Book {
   isRead: boolean;
   location: string;
   note: string;
-  pages: number;
+  pages: number | null;
   purchasedBy: string[];
   tags: string[];
   title: string;
@@ -417,13 +424,12 @@ export interface Book {
 }
 
 export interface BookInput {
-  author: string;
+  amazonUrl?: string;
   coverImageUrl?: string;
   foundBy?: string;
   groups?: string[];
   location?: string;
   note?: string;
-  pages?: number;
   purchasedBy?: string[];
   tags?: string[];
   title: string;

@@ -88,7 +88,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@vectornote/common': path.resolve(__dirname, '../../packages/common/src')
+      '@bookpoolcontexts/common': path.resolve(__dirname, '../../packages/common/src')
     }
   }
 })
@@ -100,7 +100,7 @@ export default defineConfig({
 `apps/tanstack-start/package.json`:
 ```json
 {
-  "name": "@vectornote/tanstack-start",
+  "name": "@bookpoolcontexts/tanstack-start",
   "private": true,
   "scripts": {
     "dev": "vite",
@@ -111,7 +111,7 @@ export default defineConfig({
     "format": "biome format --write ./src"
   },
   "dependencies": {
-    "@vectornote/common": "workspace:*",
+    "@bookpoolcontexts/common": "workspace:*",
     "@tanstack/react-router": "latest",
     "@tanstack/start": "latest",
     "@tanstack/react-query": "^5.0.0",
@@ -139,8 +139,8 @@ export default defineConfig({
 ```json
 {
   "scripts": {
-    "tanstack-start:dev": "pnpm --filter @vectornote/tanstack-start dev",
-    "tanstack-start:build": "pnpm --filter @vectornote/tanstack-start build"
+    "tanstack-start:dev": "pnpm --filter @bookpoolcontexts/tanstack-start dev",
+    "tanstack-start:build": "pnpm --filter @bookpoolcontexts/tanstack-start build"
   }
 }
 ```
@@ -149,7 +149,7 @@ export default defineConfig({
 
 `apps/tanstack-start/src/lib/firebase.ts`:
 ```typescript
-import { firebaseConfig } from '@vectornote/common'
+import { firebaseConfig } from '@bookpoolcontexts/common'
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
@@ -225,7 +225,7 @@ export const Route = createRootRoute({
    - リロード時も正しいページが表示
 
 4. **共通パッケージ連携確認**
-   - @vectornote/common の型定義が利用可能
+   - @bookpoolcontexts/common の型定義が利用可能
    - Firebase設定が正しく読み込まれる
 
 ## 成功指標
