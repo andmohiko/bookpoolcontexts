@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
-import type { Uid } from '@vectornote/common'
+import type { Uid } from '@bookpoolcontexts/common'
 import type { FirebaseError } from 'firebase/app'
 import type { User } from 'firebase/auth'
 import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth'
