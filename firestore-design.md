@@ -40,6 +40,7 @@
 - note: String 自由記述のメモ
 - pages: Number ページ数
 - purchasedBy: Array\<String\> 購入場所（物理本、Kindle、オフィス）
+- scrapingStatus: String スクレイピングの状態（scraping: 取得中, completed: 完了, failed: 失敗）
 - tags: Array\<String\> ジャンルタグ
 - title: String 本のタイトル
 - updatedAt: Timestamp 更新日時
