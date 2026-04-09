@@ -78,11 +78,11 @@
 
 | フィールド名 | 必須/任意 | データ型 | バリデーション |
 |-------------|----------|---------|---------------|
-| タイトル (title) | **必須** | string | 1文字以上、200文字以下 |
+| タイトル (title) | 自動取得 | string \| null | Cloud Functionsが自動取得。登録時はnull |
 | 著者 (author) | 自動取得 | string \| null | Cloud Functionsが自動取得。登録時はnull |
-| 表紙画像URL (coverImageUrl) | 任意 | string | 有効なURL形式 |
+| 表紙画像URL (coverImageUrl) | 自動取得 | string \| null | Cloud Functionsが自動取得。登録時はnull |
 | ページ数 (pages) | 自動取得 | number \| null | Cloud Functionsが自動取得。登録時はnull |
-| AmazonURL (amazonUrl) | 自動設定 | string | Amazon検索結果から自動設定 |
+| AmazonURL (amazonUrl) | **必須** | string | ユーザーがAmazonのURLを直接入力 |
 | タグ (tags) | 任意 | string[] | 各タグ50文字以下、最大10個 |
 | どこで見つけたか (foundBy) | 任意 | string | 500文字以下 |
 | どこで読めるか (location) | 任意 | string | 200文字以下 |
@@ -91,27 +91,27 @@
 | グループ (groups) | 任意 | string[] | 既存グループIDから選択 |
 
 **処理フロー:**
-1. ユーザーがフォームに入力
+1. ユーザーがAmazonのURLとタグ・グループ等のメタ情報を入力
 2. クライアント側でZodによるバリデーション
-3. Firestoreに本のデータを保存（author: null, pages: null, amazonUrl付き）
+3. Firestoreに本のデータを保存（title: null, author: null, coverImageUrl: null, pages: null, amazonUrl付き）
 4. タグ・グループのカウントを更新
 5. 成功後、一覧画面へ遷移
-6. Cloud Functions（onCreateBook トリガー）がamazonUrlからAmazon詳細ページをスクレイピングし、著者名・ページ数を自動取得してFirestoreを更新
+6. Cloud Functions（onCreateBook トリガー）がamazonUrlからAmazon詳細ページをスクレイピングし、タイトル・著者名・表紙画像URL・ページ数を自動取得してFirestoreを更新
 
-#### FR-BOOK-002: Amazon情報からの自動取得
+#### FR-BOOK-002: AmazonURLからの本情報自動取得
 
 | 項目 | 内容 |
 |------|------|
-| 概要 | 本の登録時にAmazon詳細ページから著者名・ページ数を自動取得する機能 |
-| 優先度 | 中 |
+| 概要 | 本の登録後にAmazon詳細ページからタイトル・著者名・表紙画像URL・ページ数を自動取得する機能 |
+| 優先度 | 必須 |
 
 **詳細要件:**
-- Amazon検索結果から本を選択・登録すると、ASINからAmazon詳細ページURLを自動生成しBookドキュメントに保存する
 - Cloud Functions の onCreateBook トリガーが、保存された amazonUrl を使ってAmazon詳細ページをスクレイピングする
-- 著者名（author）とページ数（pages）を自動取得し、Firestoreの該当Bookドキュメントを更新する
-- 取得できなかった場合はnullのまま維持する（エラーにはしない）
+- タイトル（title）、著者名（author）、表紙画像URL（coverImageUrl）、ページ数（pages）を自動取得し、Firestoreの該当Bookドキュメントを更新する
+- 取得できなかったフィールドはnullのまま維持する（エラーにはしない）
 - スクレイピングにはpuppeteer-core + @sparticuz/chromiumを使用する
 - 情報取得はFirebase Functions（Firestoreトリガー）経由で実行する
+- Amazon検索API（POST /books/search）は廃止。クライアント側での検索は行わない
 
 #### FR-BOOK-003: 本の編集
 
@@ -324,7 +324,7 @@ firestore/
 │       │   └── {bookId}/
 │       │       ├── amazonUrl: string
 │       │       ├── author: string | null
-│       │       ├── coverImageUrl: string
+│       │       ├── coverImageUrl: string | null
 │       │       ├── createdAt: Timestamp
 │       │       ├── foundBy: string
 │       │       ├── groups: string[]
@@ -334,7 +334,7 @@ firestore/
 │       │       ├── pages: number | null
 │       │       ├── purchasedBy: string[]
 │       │       ├── tags: string[]
-│       │       ├── title: string
+│       │       ├── title: string | null
 │       │       └── updatedAt: Timestamp
 │       ├── groups/  (サブコレクション)
 │       │   └── {groupId}/
@@ -364,9 +364,9 @@ firestore/
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
 | id | string | 自動生成ID（ドキュメントID） |
-| amazonUrl | string | Amazon詳細ページのURL（ASINから自動生成） |
+| amazonUrl | string | Amazon詳細ページのURL（ユーザーが直接入力） |
 | author | string \| null | 本の著者（Cloud Functionsが自動取得、初期値null） |
-| coverImageUrl | string | 表紙の画像URL |
+| coverImageUrl | string \| null | 表紙の画像URL（Cloud Functionsが自動取得、初期値null） |
 | createdAt | Timestamp | 登録日時 |
 | foundBy | string | どこで見つけたか（誰に勧められたかなど） |
 | groups | string[] | 所属するグループIDの配列 |
@@ -376,7 +376,7 @@ firestore/
 | pages | number \| null | ページ数（Cloud Functionsが自動取得、初期値null） |
 | purchasedBy | string[] | 購入場所（物理本、Kindle、オフィス） |
 | tags | string[] | ジャンルタグ |
-| title | string | 本のタイトル |
+| title | string \| null | 本のタイトル（Cloud Functionsが自動取得、初期値null） |
 | updatedAt | Timestamp | 更新日時 |
 
 ### 4.4 groups サブコレクション
@@ -409,7 +409,7 @@ export interface Book {
   id: string;
   amazonUrl: string;
   author: string | null;
-  coverImageUrl: string;
+  coverImageUrl: string | null;
   createdAt: Timestamp;
   foundBy: string;
   groups: string[];
@@ -419,20 +419,18 @@ export interface Book {
   pages: number | null;
   purchasedBy: string[];
   tags: string[];
-  title: string;
+  title: string | null;
   updatedAt: Timestamp;
 }
 
 export interface BookInput {
-  amazonUrl?: string;
-  coverImageUrl?: string;
+  amazonUrl: string;
   foundBy?: string;
   groups?: string[];
   location?: string;
   note?: string;
   purchasedBy?: string[];
   tags?: string[];
-  title: string;
 }
 
 export interface Group {
@@ -546,22 +544,7 @@ export interface User {
 │  [←戻る]             本を登録               │
 ├─────────────────────────────────────────────┤
 │                                             │
-│  AmazonのURL（任意）                        │
-│  ┌────────────────────────────────[取得]┐   │
-│  │                                     │   │
-│  └─────────────────────────────────────┘   │
-│                                             │
-│  タイトル *                                 │
-│  ┌─────────────────────────────────────┐   │
-│  │                                     │   │
-│  └─────────────────────────────────────┘   │
-│                                             │
-│  著者 *                                     │
-│  ┌─────────────────────────────────────┐   │
-│  │                                     │   │
-│  └─────────────────────────────────────┘   │
-│                                             │
-│  ページ数（任意）                           │
+│  AmazonのURL *                              │
 │  ┌─────────────────────────────────────┐   │
 │  │                                     │   │
 │  └─────────────────────────────────────┘   │
@@ -601,7 +584,7 @@ export interface User {
 
 **コンポーネント:**
 - BookForm
-- AmazonUrlInput (with fetch button)
+- AmazonUrlInput
 - TagInput (autocomplete)
 - GroupSelect (multi-select)
 - PurchasedByCheckbox
@@ -658,35 +641,34 @@ export interface User {
 
 ### 6.2 Firebase Functions エンドポイント
 
-#### scrapeAmazon
+#### onCreateBook
 
 | 項目 | 内容 |
 |------|------|
-| 関数名 | `scrapeAmazon` |
-| タイプ | onCall (v2) |
-| 認証 | Firebase Auth必須 |
+| 関数名 | `onCreateBook` |
+| タイプ | Firestore onCreateトリガー |
+| トリガーパス | `users/{uid}/books/{bookId}` |
 
-**リクエスト:**
-```typescript
-interface ScrapeAmazonRequest {
-  url: string;  // AmazonのURL
-}
-```
+**処理内容:**
+1. 作成されたBookドキュメントからamazonUrlを取得
+2. AmazonのURLから詳細ページをスクレイピング
+3. タイトル、著者、表紙画像URL、ページ数を取得
+4. Firestoreの該当Bookドキュメントを更新
 
-**レスポンス:**
+**レスポンス（Firestoreに更新するフィールド）:**
 ```typescript
-interface ScrapeAmazonResponse {
-  title: string;
-  author: string;
-  coverImageUrl: string;
+interface ScrapedBookData {
+  title: string | null;
+  author: string | null;
+  coverImageUrl: string | null;
   pages: number | null;
 }
 ```
 
-**処理内容:**
-1. 認証トークンを検証
-2. AmazonのURLからページ情報をスクレイピング
-3. タイトル、著者、表紙画像URL、ページ数を返却
+**備考:**
+- スクレイピングにはpuppeteer-core + @sparticuz/chromiumを使用する
+- 取得できなかったフィールドはnullのまま維持する（エラーにはしない）
+- Amazon検索API（POST /books/search）は廃止
 
 ### 6.3 クライアントサイドAPI（Firestore直接アクセス）
 
@@ -836,10 +818,7 @@ service cloud.firestore {
 import { z } from 'zod';
 
 export const bookSchema = z.object({
-  title: z.string().min(1).max(200),
-  author: z.string().min(1).max(100),
-  coverImageUrl: z.string().url().optional().or(z.literal('')),
-  pages: z.number().min(1).max(99999).optional(),
+  amazonUrl: z.string().url(),
   tags: z.array(z.string().max(50)).max(10).optional(),
   foundBy: z.string().max(500).optional(),
   location: z.string().max(200).optional(),
@@ -874,7 +853,6 @@ export type GroupInput = z.infer<typeof groupSchema>;
 
 | 優先度 | 機能 | 概要 |
 |--------|------|------|
-| 高 | Amazon情報自動取得 | URLからタイトル・著者・表紙・ページ数を自動入力 |
 | 高 | 読書ログ | 読了した本に感想やレビューを記録する機能 |
 | 中 | 並び替え | 登録日時以外のソート（タイトル順、著者順、ページ数順） |
 | 中 | 検索機能 | タイトル・著者によるテキスト検索 |
@@ -923,6 +901,7 @@ VITE_FIREBASE_APP_ID=xxx
 | 日付 | バージョン | 変更内容 | 担当者 |
 |------|-----------|---------|--------|
 | 2026-04-07 | 1.0 | 初版作成 | - |
+| 2026-04-08 | 1.1 | 本の登録フローをAmazon検索方式からURL直接入力方式に変更。title/author/coverImageUrl/pagesはクライアントからnullで登録し、onCreateBookトリガーで自動取得する方式に変更。Amazon検索API廃止 | - |
 
 ---
 
