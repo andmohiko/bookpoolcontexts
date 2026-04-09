@@ -1,5 +1,4 @@
 import { check } from 'express-validator'
-import { authMiddleware } from '~/middleware/auth'
 
 const cors = require('cors')({ origin: true })
 const express = require('express')
@@ -14,13 +13,6 @@ router.post(
   '/health',
   [check('message').exists()],
   require('./api/health/test').handle,
-)
-
-router.post(
-  '/books/search',
-  authMiddleware,
-  [check('keyword').isString().notEmpty()],
-  require('./api/books/searchBooks').handle,
 )
 
 app.use(router)

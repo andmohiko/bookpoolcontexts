@@ -1,7 +1,9 @@
 import type { UpdateBookDtoFromAdmin } from '@bookpoolcontexts/common'
+import { FieldValue } from 'firebase-admin/firestore'
 import { onDocumentCreated } from 'firebase-functions/v2/firestore'
 import '~/config/firebase'
 import { updateBookOperation } from '~/infrastructure/firestore/books'
+import { updateGroupOperation } from '~/infrastructure/firestore/groups'
 import { fetchAmazonBookDetail } from '~/lib/amazon'
 import { serverTimestamp } from '~/lib/firebase'
 import { triggerOnce } from '~/utils/triggerOnce'
@@ -25,22 +27,30 @@ export const onCreateBook = onDocumentCreated(
     }
 
     try {
+      console.log('スクレイピング開始:', bookId, amazonUrl)
       const detail = await fetchAmazonBookDetail(amazonUrl)
+      console.log('スクレイピング結果:', bookId, JSON.stringify(detail))
 
       const updateDto: UpdateBookDtoFromAdmin = {
         updatedAt: serverTimestamp,
       }
 
+      if (detail.title) {
+        updateDto.title = detail.title
+      }
       if (detail.author) {
         updateDto.author = detail.author
+      }
+      if (detail.coverImageUrl) {
+        updateDto.coverImageUrl = detail.coverImageUrl
       }
       if (detail.pages > 0) {
         updateDto.pages = detail.pages
       }
 
-      // author も pages も取得できなかった場合は更新しない
-      if (!detail.author && detail.pages === 0) {
-        console.log('著者名・ページ数ともに取得できませんでした:', bookId)
+      // すべて取得できなかった場合は更新しない
+      if (!detail.title && !detail.author && !detail.coverImageUrl && detail.pages === 0) {
+        console.log('本の情報を取得できませんでした:', bookId)
         return
       }
 
@@ -48,6 +58,22 @@ export const onCreateBook = onDocumentCreated(
       console.log('Book詳細情報を更新しました:', bookId, detail)
     } catch (error) {
       console.error('Amazon詳細ページのスクレイピングに失敗:', bookId, error)
+    }
+
+    // グループ count 同期
+    const groups: string[] = data.groups ?? []
+    if (groups.length > 0) {
+      for (const groupId of groups) {
+        try {
+          await updateGroupOperation(uid, groupId, {
+            count: FieldValue.increment(1),
+            updatedAt: serverTimestamp,
+          })
+        } catch (error) {
+          console.error('グループカウント更新に失敗:', groupId, error)
+        }
+      }
+      console.log('グループカウントを更新しました:', bookId, groups)
     }
   }),
 )

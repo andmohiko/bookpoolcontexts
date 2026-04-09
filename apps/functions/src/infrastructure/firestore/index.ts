@@ -17,3 +17,4 @@ export {
   fetchUserOperation,
   updateUserOperation,
 } from './users'
+export { updateGroupOperation } from './groups'

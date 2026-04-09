@@ -1,9 +1,6 @@
-import type { AmazonBookItem } from '@bookpoolcontexts/common'
 import chromium from '@sparticuz/chromium'
 import type { Page } from 'puppeteer-core'
 import puppeteer from 'puppeteer-core'
-
-const AMAZON_SEARCH_URL = 'https://www.amazon.co.jp/s'
 
 const isLocal = process.env.FUNCTIONS_EMULATOR === 'true'
 
@@ -50,33 +47,112 @@ const setupAmazonPage = async (page: Page): Promise<void> => {
     'Sec-Fetch-User': '?1',
     'Upgrade-Insecure-Requests': '1',
   })
-  await page.goto('https://www.amazon.co.jp', { waitUntil: 'networkidle2', timeout: 20000 })
+  await page.goto('https://www.amazon.co.jp', { waitUntil: 'networkidle2', timeout: 30000 })
+}
+
+/** AmazonのURLからクリーンな /dp/ASIN URLを生成する */
+const normalizeAmazonUrl = async (url: string): Promise<string> => {
+  // /dp/ASIN パターンを抽出（10桁の英数字）
+  const dpMatch = url.match(/\/dp\/([A-Z0-9]{10})/)
+  if (dpMatch) {
+    return `https://www.amazon.co.jp/dp/${dpMatch[1]}`
+  }
+
+  // 短縮URL（amzn.asia等）の場合、リダイレクト先のLocationヘッダーからASINを抽出する
+  console.log('短縮URLを解決します:', url)
+  const res = await fetch(url, { redirect: 'manual' })
+  const location = res.headers.get('location') ?? ''
+  console.log('リダイレクト先:', location)
+
+  const resolvedDpMatch = location.match(/\/dp\/([A-Z0-9]{10})/)
+  if (resolvedDpMatch) {
+    return `https://www.amazon.co.jp/dp/${resolvedDpMatch[1]}`
+  }
+
+  // ASINが取れない場合はクエリパラメータを除去して返す
+  try {
+    const urlObj = new URL(location || url)
+    return `${urlObj.origin}${urlObj.pathname}`
+  } catch {
+    return url
+  }
 }
 
 export type AmazonBookDetail = {
+  title: string
   author: string
+  coverImageUrl: string
   pages: number
 }
 
-/** Amazon詳細ページから著者名とページ数を取得する */
+const EMPTY_RESULT: AmazonBookDetail = { title: '', author: '', coverImageUrl: '', pages: 0 }
+
+/** Amazon詳細ページからタイトル・著者名・表紙画像URL・ページ数を取得する */
 export const fetchAmazonBookDetail = async (
   amazonUrl: string,
 ): Promise<AmazonBookDetail> => {
+  const normalizedUrl = await normalizeAmazonUrl(amazonUrl)
+  console.log('正規化URL:', normalizedUrl)
+
   const browser = await launchBrowser()
 
   try {
     const page = await browser.newPage()
     await setupAmazonPage(page)
 
-    await page.goto(amazonUrl, { waitUntil: 'networkidle2', timeout: 20000 })
+    await page.goto(normalizedUrl, { waitUntil: 'networkidle2', timeout: 30000 })
+
+    // デバッグ: ページURLとタイトルをログ出力
+    const pageUrl = page.url()
+    const pageTitle = await page.title()
+    console.log('スクレイピング対象URL:', pageUrl)
+    console.log('ページタイトル:', pageTitle)
+
+    // CAPTCHA検知
+    const hasCaptcha = await page.evaluate(() => {
+      return !!document.querySelector('#captchacharacters') || !!document.querySelector('form[action*="validateCaptcha"]')
+    })
+    if (hasCaptcha) {
+      console.error('CAPTCHA検知: Amazonからボットブロックされています')
+      return EMPTY_RESULT
+    }
+
+    // 503検知
+    if (pageTitle.includes('503') || pageTitle.includes('Service Unavailable')) {
+      console.error('503検知: ページが利用できません。リトライします')
+      // 少し待ってリトライ
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      await page.goto(normalizedUrl, { waitUntil: 'networkidle2', timeout: 30000 })
+      const retryTitle = await page.title()
+      console.log('リトライ後ページタイトル:', retryTitle)
+      if (retryTitle.includes('503') || retryTitle.includes('Service Unavailable')) {
+        console.error('リトライ後も503: 取得を断念します')
+        return EMPTY_RESULT
+      }
+    }
 
     const detail = await page.evaluate(() => {
+      // タイトルを取得
+      const titleEl =
+        document.querySelector('#productTitle') ??
+        document.querySelector('#ebooksProductTitle')
+      const title = titleEl?.textContent?.trim() ?? ''
+
       // 著者名を取得
       const authorEl =
         document.querySelector('#bylineInfo .author a') ??
         document.querySelector('.author a') ??
         document.querySelector('.contributorNameID')
       const author = authorEl?.textContent?.trim() ?? ''
+
+      // 表紙画像URLを取得
+      const imgEl =
+        (document.querySelector('#imgTagWrapperId img') as HTMLImageElement | null) ??
+        (document.querySelector('#landingImage') as HTMLImageElement | null) ??
+        (document.querySelector('#imgBlkFront') as HTMLImageElement | null) ??
+        (document.querySelector('#ebooksImgBlkFront') as HTMLImageElement | null) ??
+        (document.querySelector('#main-image-container img') as HTMLImageElement | null)
+      const coverImageUrl = imgEl?.src ?? ''
 
       // ページ数を取得
       let pages = 0
@@ -103,67 +179,10 @@ export const fetchAmazonBookDetail = async (
         }
       }
 
-      return { author, pages }
+      return { title, author, coverImageUrl, pages }
     })
 
     return detail
-  } finally {
-    await browser.close()
-  }
-}
-
-/** Amazon.co.jp の書籍検索ページをスクレイピングして本の情報を取得する */
-export const searchAmazonBooks = async (
-  keyword: string,
-): Promise<AmazonBookItem[]> => {
-  const browser = await launchBrowser()
-
-  try {
-    const page = await browser.newPage()
-    await setupAmazonPage(page)
-
-    const url = `${AMAZON_SEARCH_URL}?k=${encodeURIComponent(keyword)}&i=stripbooks`
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 20000 })
-
-    const items = await page.evaluate(() => {
-      const results: Array<{
-        asin: string
-        title: string
-        coverImageUrl: string
-        amazonUrl: string
-      }> = []
-
-      // data-asin 属性を持つ要素を探す
-      const allWithAsin = document.querySelectorAll('[data-asin]')
-      for (const el of allWithAsin) {
-        if (results.length >= 15) break
-
-        const asin = el.getAttribute('data-asin')
-        if (!asin || asin === '') continue
-
-        // タイトルを探す（複数パターンに対応）
-        const titleEl =
-          el.querySelector('h2 a span') ??
-          el.querySelector('h2 .a-text-normal') ??
-          el.querySelector('.a-size-medium.a-text-normal') ??
-          el.querySelector('[data-cy="title-recipe"] a span')
-        const title = titleEl?.textContent?.trim() ?? ''
-        if (!title) continue
-
-        // 画像を探す
-        const imgEl =
-          (el.querySelector('.s-image') as HTMLImageElement | null) ??
-          (el.querySelector('img[data-image-latency="s-product-image"]') as HTMLImageElement | null) ??
-          (el.querySelector('.s-product-image-container img') as HTMLImageElement | null)
-        const coverImageUrl = imgEl?.src ?? ''
-
-        results.push({ asin, title, coverImageUrl, amazonUrl: `https://www.amazon.co.jp/dp/${asin}` })
-      }
-
-      return results
-    })
-
-    return items
   } finally {
     await browser.close()
   }

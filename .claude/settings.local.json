@@ -14,7 +14,8 @@
       "Bash(pnpm --filter @bookpoolcontexts/web tsc --noEmit)",
       "Bash(firebase firestore:indexes)",
       "Bash(pnpm web build)",
-      "Bash(pnpm functions pre-build)"
+      "Bash(pnpm functions pre-build)",
+      "Bash(firebase functions:log --only onCreateBook)"
     ],
     "deny": [],
     "ask": []
