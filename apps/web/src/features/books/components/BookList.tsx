@@ -5,12 +5,12 @@ import { useBooks } from '@/features/books/hooks/useBooks'
 
 type BookListProps = {
   tag?: string
-  groupId?: string
+  group?: string
   onClickBook: (book: Book) => void
 }
 
-export const BookList = ({ tag, groupId, onClickBook }: BookListProps) => {
-  const { books, isLoading } = useBooks()
+export const BookList = ({ group, onClickBook }: BookListProps) => {
+  const { books, isLoading } = useBooks({ group })
 
   if (isLoading) {
     return (
