@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { z } from 'zod'
 import type { Book } from '@bookpoolcontexts/common'
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,7 @@ import { BookList } from '@/features/books/components/BookList'
 import { BookRegistrationModal } from '@/features/books/components/BookRegistrationModal'
 import { useTags } from '@/features/tags/hooks/useTags'
 import { useDisclosure } from '@/hooks/useDisclosure'
+import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
 
 export const Route = createFileRoute('/_authed/')({
   validateSearch: z.object({ tag: z.string().optional(), group: z.string().optional() }),
@@ -21,6 +22,18 @@ function HomePage() {
   const { isOpen: isCreateOpen, open: openCreate, close: closeCreate } = useDisclosure()
   const { isOpen: isEditOpen, open: openEdit, close: closeEdit } = useDisclosure()
   const [selectedBook, setSelectedBook] = useState<Book | null>(null)
+
+  useKeyboardShortcut(
+    'c',
+    useCallback(
+      (e) => {
+        if (isCreateOpen) return
+        e.preventDefault()
+        openCreate()
+      },
+      [isCreateOpen, openCreate],
+    ),
+  )
 
   const handleClickBook = (book: Book): void => {
     setSelectedBook(book)

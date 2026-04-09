@@ -118,7 +118,15 @@ export const BookRegistrationModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
+      <DialogContent
+        className="max-h-[85vh] overflow-y-auto sm:max-w-md"
+        onOpenAutoFocus={(e) => {
+          e.preventDefault()
+          setTimeout(() => {
+            document.getElementById('amazonUrl')?.focus()
+          }, 0)
+        }}
+      >
         <DialogHeader>
           <DialogTitle>本を登録</DialogTitle>
         </DialogHeader>
