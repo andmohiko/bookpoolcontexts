@@ -31,9 +31,7 @@ export const BookCard = ({ book, onClick }: BookCardProps) => {
               {tag}
             </Badge>
           ))
-        ) : (
-          <span className="text-[10px] text-muted-foreground">タグなし</span>
-        )}
+        ) : null}
       </div>
       {book.isRead && (
         <span className="absolute top-1 right-1 rounded bg-background/80 px-1 text-[10px] text-muted-foreground">
