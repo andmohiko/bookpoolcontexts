@@ -17,17 +17,17 @@ export const updateBookOperation = async (
     .update(dto)
 }
 
-/** 特定グループに所属する全ての本から groupId を除去する */
+/** 特定グループに所属する全ての本からグループラベルを除去する */
 export const removeGroupFromAllBooksOperation = async (
   uid: string,
-  groupId: string,
+  groupLabel: string,
 ): Promise<void> => {
   const booksRef = db
     .collection(userCollection)
     .doc(uid)
     .collection(bookCollection)
   const snapshot = await booksRef
-    .where('groups', 'array-contains', groupId)
+    .where('groups', 'array-contains', groupLabel)
     .get()
 
   if (snapshot.empty) return
@@ -35,8 +35,9 @@ export const removeGroupFromAllBooksOperation = async (
   const batch = db.batch()
   for (const doc of snapshot.docs) {
     batch.update(doc.ref, {
-      groups: FieldValue.arrayRemove(groupId),
+      groups: FieldValue.arrayRemove(groupLabel),
       updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: 'trigger' as const,
     })
   }
   await batch.commit()

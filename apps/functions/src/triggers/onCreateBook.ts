@@ -3,7 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore'
 import { onDocumentCreated } from 'firebase-functions/v2/firestore'
 import '~/config/firebase'
 import { updateBookOperation } from '~/infrastructure/firestore/books'
-import { updateGroupOperation } from '~/infrastructure/firestore/groups'
+import { updateGroupByLabelOperation } from '~/infrastructure/firestore/groups'
 import { fetchAmazonBookDetail } from '~/lib/amazon'
 import { serverTimestamp } from '~/lib/firebase'
 import { triggerOnce } from '~/utils/triggerOnce'
@@ -33,6 +33,7 @@ export const onCreateBook = onDocumentCreated(
 
       const updateDto: UpdateBookDtoFromAdmin = {
         updatedAt: serverTimestamp,
+        updatedBy: 'trigger' as const,
       }
 
       if (detail.title) {
@@ -63,14 +64,14 @@ export const onCreateBook = onDocumentCreated(
     // グループ count 同期
     const groups: string[] = data.groups ?? []
     if (groups.length > 0) {
-      for (const groupId of groups) {
+      for (const groupLabel of groups) {
         try {
-          await updateGroupOperation(uid, groupId, {
+          await updateGroupByLabelOperation(uid, groupLabel, {
             count: FieldValue.increment(1),
             updatedAt: serverTimestamp,
           })
         } catch (error) {
-          console.error('グループカウント更新に失敗:', groupId, error)
+          console.error('グループカウント更新に失敗:', groupLabel, error)
         }
       }
       console.log('グループカウントを更新しました:', bookId, groups)

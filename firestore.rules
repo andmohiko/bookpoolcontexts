@@ -27,7 +27,7 @@ service cloud.firestore {
 
     // Book のスキーマバリデーション
     function isValidBookSchema(requestData) {
-      return requestData.size() == 14
+      return requestData.size() == 15
         && 'amazonUrl' in requestData && requestData.amazonUrl is string
         && 'author' in requestData && (requestData.author is string || requestData.author == null)
         && 'coverImageUrl' in requestData && (requestData.coverImageUrl is string || requestData.coverImageUrl == null)
@@ -41,7 +41,8 @@ service cloud.firestore {
         && 'purchasedBy' in requestData && requestData.purchasedBy is list
         && 'tags' in requestData && requestData.tags is list
         && 'title' in requestData && (requestData.title is string || requestData.title == null)
-        && 'updatedAt' in requestData && requestData.updatedAt is timestamp;
+        && 'updatedAt' in requestData && requestData.updatedAt is timestamp
+        && 'updatedBy' in requestData && requestData.updatedBy is string;
     }
 
     // Group のスキーマバリデーション
