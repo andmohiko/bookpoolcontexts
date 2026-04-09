@@ -1,5 +1,5 @@
 import { Link, useSearch } from '@tanstack/react-router'
-import { DownloadIcon, TagIcon } from 'lucide-react'
+import { DownloadIcon, FolderOpen, Settings2, TagIcon } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -14,11 +14,13 @@ import {
   SidebarMenuSkeleton,
   SidebarRail,
 } from '@/components/ui/sidebar'
+import { useGroups } from '@/features/groups/hooks/useGroups'
 import { useTags } from '@/features/tags/hooks/useTags'
 import { usePWAInstall } from '@/hooks/usePWAInstall'
 
 export const SideNav = () => {
-  const { tags, isLoading } = useTags()
+  const { tags, isLoading: isLoadingTags } = useTags()
+  const { groups, isLoading: isLoadingGroups } = useGroups()
   const search = useSearch({ strict: false }) as { tag?: string }
   const selectedTag = search.tag ?? null
   const { canInstall, promptInstall } = usePWAInstall()
@@ -44,7 +46,7 @@ export const SideNav = () => {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              {isLoading
+              {isLoadingTags
                 ? Array.from({ length: 4 }).map((_, i) => (
                     <SidebarMenuItem key={i}>
                       <SidebarMenuSkeleton />
@@ -66,6 +68,37 @@ export const SideNav = () => {
                       <SidebarMenuBadge>{tag.count}</SidebarMenuBadge>
                     </SidebarMenuItem>
                   ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>グループ</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu className="gap-2">
+              {isLoadingGroups
+                ? Array.from({ length: 3 }).map((_, i) => (
+                    <SidebarMenuItem key={i}>
+                      <SidebarMenuSkeleton />
+                    </SidebarMenuItem>
+                  ))
+                : groups.map((group) => (
+                    <SidebarMenuItem key={group.groupId}>
+                      <SidebarMenuButton tooltip={group.label}>
+                        <FolderOpen />
+                        <span>{group.label}</span>
+                      </SidebarMenuButton>
+                      <SidebarMenuBadge>{group.count}</SidebarMenuBadge>
+                    </SidebarMenuItem>
+                  ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="グループ管理">
+                  <Link to="/groups">
+                    <Settings2 />
+                    <span>グループ管理</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

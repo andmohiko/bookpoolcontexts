@@ -13,7 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedSettingsRouteImport } from './routes/_authed/settings'
-import { Route as AuthedNewRouteImport } from './routes/_authed/new'
+import { Route as AuthedGroupsRouteImport } from './routes/_authed/groups'
 import { Route as AuthedAboutRouteImport } from './routes/_authed/about'
 import { Route as AuthedDemoTanstackQueryRouteImport } from './routes/_authed/demo/tanstack-query'
 
@@ -36,9 +36,9 @@ const AuthedSettingsRoute = AuthedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedNewRoute = AuthedNewRouteImport.update({
-  id: '/new',
-  path: '/new',
+const AuthedGroupsRoute = AuthedGroupsRouteImport.update({
+  id: '/groups',
+  path: '/groups',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedAboutRoute = AuthedAboutRouteImport.update({
@@ -56,14 +56,14 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
   '/login': typeof LoginRoute
   '/about': typeof AuthedAboutRoute
-  '/new': typeof AuthedNewRoute
+  '/groups': typeof AuthedGroupsRoute
   '/settings': typeof AuthedSettingsRoute
   '/demo/tanstack-query': typeof AuthedDemoTanstackQueryRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/about': typeof AuthedAboutRoute
-  '/new': typeof AuthedNewRoute
+  '/groups': typeof AuthedGroupsRoute
   '/settings': typeof AuthedSettingsRoute
   '/': typeof AuthedIndexRoute
   '/demo/tanstack-query': typeof AuthedDemoTanstackQueryRoute
@@ -73,7 +73,7 @@ export interface FileRoutesById {
   '/_authed': typeof AuthedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authed/about': typeof AuthedAboutRoute
-  '/_authed/new': typeof AuthedNewRoute
+  '/_authed/groups': typeof AuthedGroupsRoute
   '/_authed/settings': typeof AuthedSettingsRoute
   '/_authed/': typeof AuthedIndexRoute
   '/_authed/demo/tanstack-query': typeof AuthedDemoTanstackQueryRoute
@@ -84,17 +84,23 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/about'
-    | '/new'
+    | '/groups'
     | '/settings'
     | '/demo/tanstack-query'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/about' | '/new' | '/settings' | '/' | '/demo/tanstack-query'
+  to:
+    | '/login'
+    | '/about'
+    | '/groups'
+    | '/settings'
+    | '/'
+    | '/demo/tanstack-query'
   id:
     | '__root__'
     | '/_authed'
     | '/login'
     | '/_authed/about'
-    | '/_authed/new'
+    | '/_authed/groups'
     | '/_authed/settings'
     | '/_authed/'
     | '/_authed/demo/tanstack-query'
@@ -135,11 +141,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedSettingsRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/new': {
-      id: '/_authed/new'
-      path: '/new'
-      fullPath: '/new'
-      preLoaderRoute: typeof AuthedNewRouteImport
+    '/_authed/groups': {
+      id: '/_authed/groups'
+      path: '/groups'
+      fullPath: '/groups'
+      preLoaderRoute: typeof AuthedGroupsRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/about': {
@@ -161,7 +167,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthedRouteChildren {
   AuthedAboutRoute: typeof AuthedAboutRoute
-  AuthedNewRoute: typeof AuthedNewRoute
+  AuthedGroupsRoute: typeof AuthedGroupsRoute
   AuthedSettingsRoute: typeof AuthedSettingsRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
   AuthedDemoTanstackQueryRoute: typeof AuthedDemoTanstackQueryRoute
@@ -169,7 +175,7 @@ interface AuthedRouteChildren {
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAboutRoute: AuthedAboutRoute,
-  AuthedNewRoute: AuthedNewRoute,
+  AuthedGroupsRoute: AuthedGroupsRoute,
   AuthedSettingsRoute: AuthedSettingsRoute,
   AuthedIndexRoute: AuthedIndexRoute,
   AuthedDemoTanstackQueryRoute: AuthedDemoTanstackQueryRoute,
