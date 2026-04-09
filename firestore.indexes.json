@@ -1,32 +1,19 @@
 {
   "indexes": [
     {
-      "collectionGroup": "notes",
+      "collectionGroup": "books",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "__name__", "order": "ASCENDING" },
         {
-          "fieldPath": "embedding",
-          "vectorConfig": { "dimension": 1536, "flat": {} }
+          "fieldPath": "groups",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "notes",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "tags", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "updatedAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "notes",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "isPinned", "order": "ASCENDING" },
-        { "fieldPath": "updatedAt", "order": "DESCENDING" }
-      ]
     }
   ],
   "fieldOverrides": []
