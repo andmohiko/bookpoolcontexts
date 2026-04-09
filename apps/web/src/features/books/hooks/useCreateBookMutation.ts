@@ -7,8 +7,6 @@ import { serverTimestamp } from '@/lib/firebase'
 import { errorMessage } from '@/utils/errorMessage'
 
 export type CreateBookInput = {
-  title: string
-  coverImageUrl: string
   amazonUrl: string
   tags: string[]
   foundBy: string
@@ -33,7 +31,9 @@ export const useCreateBookMutation = (): UseCreateBookMutationReturn => {
     try {
       const dto: CreateBookDto = {
         ...input,
+        title: null,
         author: null,
+        coverImageUrl: null,
         pages: null,
         isRead: false,
         createdAt: serverTimestamp,

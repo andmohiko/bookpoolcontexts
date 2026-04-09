@@ -33,9 +33,9 @@ export const BookList = ({ tag, onClickBook }: BookListProps) => {
 
   if (isLoading) {
     return (
-      <div className="flex flex-wrap gap-3">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={`skeleton-${i}`} className="h-[300px] w-[240px] rounded-lg" />
+          <Skeleton key={`skeleton-${i}`} className="aspect-[4/5] w-full rounded-lg" />
         ))}
       </div>
     )
@@ -50,10 +50,12 @@ export const BookList = ({ tag, onClickBook }: BookListProps) => {
   }
 
   return (
-    <div className="flex flex-wrap gap-3">
-      {books.map((book) => (
-        <BookCard key={book.bookId} book={book} onClick={onClickBook} />
-      ))}
+    <>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+        {books.map((book) => (
+          <BookCard key={book.bookId} book={book} onClick={onClickBook} />
+        ))}
+      </div>
       {hasMore && (
         <div ref={sentinelRef} className="flex justify-center py-4">
           {isLoadingMore && (
@@ -61,6 +63,6 @@ export const BookList = ({ tag, onClickBook }: BookListProps) => {
           )}
         </div>
       )}
-    </div>
+    </>
   )
 }

@@ -1,4 +1,3 @@
-export * from './AmazonBook'
 export * from './Auth'
 export * from './Book'
 export * from './Group'

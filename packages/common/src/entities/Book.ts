@@ -12,7 +12,7 @@ export type Book = {
   bookId: BookId
   amazonUrl: string
   author: string | null
-  coverImageUrl: string
+  coverImageUrl: string | null
   createdAt: Date
   foundBy: string
   groups: string[]
@@ -22,7 +22,7 @@ export type Book = {
   pages: number | null
   purchasedBy: string[]
   tags: string[]
-  title: string
+  title: string | null
   updatedAt: Date
 }
 

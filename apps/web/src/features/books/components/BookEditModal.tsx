@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { X } from 'lucide-react'
+import type { Book } from '@bookpoolcontexts/common'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -15,29 +16,32 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { GroupCheckboxList } from '@/features/groups/components/GroupCheckboxList'
 import { TagSuggestionDropdown } from '@/features/tags/components/TagSuggestionDropdown'
-import { useCreateBookMutation } from '@/features/books/hooks/useCreateBookMutation'
+import { DeleteBookAlertDialog } from '@/features/books/components/DeleteBookAlertDialog'
+import { useUpdateBookMutation } from '@/features/books/hooks/useUpdateBookMutation'
 import {
-  bookRegistrationSchema,
-  type BookRegistrationFormValues,
+  bookEditSchema,
+  type BookEditFormValues,
 } from '@/features/books/schemas/bookSchema'
 
 const PURCHASED_BY_OPTIONS = ['物理本', 'Kindle', 'オフィス'] as const
 
-type BookRegistrationModalProps = {
+type BookEditModalProps = {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
+  book: Book
 }
 
-export const BookRegistrationModal = ({
+export const BookEditModal = ({
   isOpen,
   onClose,
   onSuccess,
-}: BookRegistrationModalProps) => {
-  const { createBook, isCreating } = useCreateBookMutation()
+  book,
+}: BookEditModalProps) => {
+  const { updateBook, isUpdating } = useUpdateBookMutation()
   const [tagInput, setTagInput] = useState('')
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
   const {
     register,
@@ -45,41 +49,37 @@ export const BookRegistrationModal = ({
     reset,
     setValue,
     watch,
-    formState: { errors },
-  } = useForm<BookRegistrationFormValues>({
-    resolver: zodResolver(bookRegistrationSchema),
+  } = useForm<BookEditFormValues>({
+    resolver: zodResolver(bookEditSchema),
     defaultValues: {
-      amazonUrl: '',
-      tags: [],
-      foundBy: '',
-      location: '',
-      purchasedBy: [],
-      groups: [],
-      note: '',
+      tags: book.tags,
+      foundBy: book.foundBy,
+      location: book.location,
+      purchasedBy: book.purchasedBy,
+      groups: book.groups,
+      note: book.note,
     },
   })
 
   const tags = watch('tags')
   const purchasedBy = watch('purchasedBy')
-  const groups = watch('groups')
 
   useEffect(() => {
     if (isOpen) {
       reset({
-        amazonUrl: '',
-        tags: [],
-        foundBy: '',
-        location: '',
-        purchasedBy: [],
-        groups: [],
-        note: '',
+        tags: book.tags,
+        foundBy: book.foundBy,
+        location: book.location,
+        purchasedBy: book.purchasedBy,
+        groups: book.groups,
+        note: book.note,
       })
       setTagInput('')
     }
-  }, [isOpen, reset])
+  }, [isOpen, book, reset])
 
-  const onSubmit = async (data: BookRegistrationFormValues): Promise<void> => {
-    await createBook(data)
+  const onSubmit = async (data: BookEditFormValues): Promise<void> => {
+    await updateBook(book.bookId, data)
     onSuccess()
   }
 
@@ -120,22 +120,27 @@ export const BookRegistrationModal = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>本を登録</DialogTitle>
+          <DialogTitle>本を編集</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="amazonUrl">AmazonのURL *</Label>
-            <Input
-              id="amazonUrl"
-              placeholder="https://www.amazon.co.jp/dp/..."
-              {...register('amazonUrl')}
+        {book.coverImageUrl && (
+          <div className="flex justify-center">
+            <img
+              src={book.coverImageUrl}
+              alt={book.title ?? ''}
+              className="h-32 rounded-md object-cover"
             />
-            {errors.amazonUrl && (
-              <p className="text-xs text-destructive">{errors.amazonUrl.message}</p>
-            )}
           </div>
+        )}
 
+        {book.title && (
+          <p className="text-center text-sm font-medium">{book.title}</p>
+        )}
+        {book.author && (
+          <p className="text-center text-xs text-muted-foreground">{book.author}</p>
+        )}
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label>タグ</Label>
             <div className="flex flex-wrap gap-1.5">
@@ -166,18 +171,18 @@ export const BookRegistrationModal = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="foundBy">どこで見つけたか</Label>
+            <Label htmlFor="edit-foundBy">どこで見つけたか</Label>
             <Input
-              id="foundBy"
+              id="edit-foundBy"
               placeholder="SNS、友人の推薦、書店で見かけたなど"
               {...register('foundBy')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="location">どこで読めるか</Label>
+            <Label htmlFor="edit-location">どこで読めるか</Label>
             <Input
-              id="location"
+              id="edit-location"
               placeholder="図書館、ブックオフ、Kindle Unlimitedなど"
               {...register('location')}
             />
@@ -202,32 +207,44 @@ export const BookRegistrationModal = ({
           </div>
 
           <div className="space-y-2">
-            <Label>グループ</Label>
-            <GroupCheckboxList
-              selectedGroupIds={groups}
-              onChange={(groupIds) => setValue('groups', groupIds)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="note">メモ</Label>
+            <Label htmlFor="edit-note">メモ</Label>
             <Textarea
-              id="note"
+              id="edit-note"
               placeholder="なぜこの本を読みたいか、期待することなど"
               rows={3}
               {...register('note')}
             />
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              キャンセル
+          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
+            <Button
+              type="button"
+              variant="ghost"
+              className="text-destructive hover:text-destructive"
+              onClick={() => setIsDeleteDialogOpen(true)}
+            >
+              削除
             </Button>
-            <Button type="submit" disabled={isCreating}>
-              {isCreating ? '登録中...' : '登録'}
-            </Button>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={onClose}>
+                キャンセル
+              </Button>
+              <Button type="submit" disabled={isUpdating}>
+                {isUpdating ? '更新中...' : '更新'}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
+
+        <DeleteBookAlertDialog
+          isOpen={isDeleteDialogOpen}
+          onClose={() => setIsDeleteDialogOpen(false)}
+          onSuccess={() => {
+            setIsDeleteDialogOpen(false)
+            onClose()
+          }}
+          book={book}
+        />
       </DialogContent>
     </Dialog>
   )
