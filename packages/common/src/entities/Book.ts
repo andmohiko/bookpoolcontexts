@@ -10,6 +10,9 @@ export type BookId = string
 /** ドキュメント更新の操作主 */
 export type UpdatedBy = 'trigger' | 'user'
 
+/** スクレイピングの状態 */
+export type ScrapingStatus = 'scraping' | 'completed' | 'failed'
+
 /** Entity型（Firestoreから取得したデータ、Date変換済み） */
 export type Book = {
   bookId: BookId
@@ -24,6 +27,7 @@ export type Book = {
   note: string
   pages: number | null
   purchasedBy: string[]
+  scrapingStatus: ScrapingStatus
   tags: string[]
   title: string | null
   updatedAt: Date
@@ -51,6 +55,7 @@ export type UpdateBookDto = {
   note?: Book['note']
   pages?: Book['pages']
   purchasedBy?: Book['purchasedBy']
+  scrapingStatus?: Book['scrapingStatus']
   tags?: Book['tags']
   title?: Book['title']
   updatedAt: FieldValue
@@ -63,6 +68,7 @@ export type UpdateBookDtoFromAdmin = {
   author?: Book['author']
   coverImageUrl?: Book['coverImageUrl']
   pages?: Book['pages']
+  scrapingStatus?: Book['scrapingStatus']
   title?: Book['title']
   updatedAt: AdminFieldValue
   updatedBy: UpdatedBy

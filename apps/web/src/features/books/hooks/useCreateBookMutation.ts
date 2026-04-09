@@ -36,6 +36,7 @@ export const useCreateBookMutation = (): UseCreateBookMutationReturn => {
         coverImageUrl: null,
         pages: null,
         isRead: false,
+        scrapingStatus: 'scraping' as const,
         createdAt: serverTimestamp,
         updatedAt: serverTimestamp,
         updatedBy: 'user' as const,

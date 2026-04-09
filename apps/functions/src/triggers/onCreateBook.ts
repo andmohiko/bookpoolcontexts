@@ -23,6 +23,11 @@ export const onCreateBook = onDocumentCreated(
 
     if (!amazonUrl) {
       console.log('amazonUrl が存在しないためスキップ:', bookId)
+      await updateBookOperation(uid, bookId, {
+        scrapingStatus: 'failed',
+        updatedAt: serverTimestamp,
+        updatedBy: 'trigger' as const,
+      })
       return
     }
 
@@ -32,6 +37,7 @@ export const onCreateBook = onDocumentCreated(
       console.log('スクレイピング結果:', bookId, JSON.stringify(detail))
 
       const updateDto: UpdateBookDtoFromAdmin = {
+        scrapingStatus: 'completed',
         updatedAt: serverTimestamp,
         updatedBy: 'trigger' as const,
       }
@@ -49,9 +55,14 @@ export const onCreateBook = onDocumentCreated(
         updateDto.pages = detail.pages
       }
 
-      // すべて取得できなかった場合は更新しない
+      // すべて取得できなかった場合はfailedにする
       if (!detail.title && !detail.author && !detail.coverImageUrl && detail.pages === 0) {
         console.log('本の情報を取得できませんでした:', bookId)
+        await updateBookOperation(uid, bookId, {
+          scrapingStatus: 'failed',
+          updatedAt: serverTimestamp,
+          updatedBy: 'trigger' as const,
+        })
         return
       }
 
@@ -59,6 +70,15 @@ export const onCreateBook = onDocumentCreated(
       console.log('Book詳細情報を更新しました:', bookId, detail)
     } catch (error) {
       console.error('Amazon詳細ページのスクレイピングに失敗:', bookId, error)
+      try {
+        await updateBookOperation(uid, bookId, {
+          scrapingStatus: 'failed',
+          updatedAt: serverTimestamp,
+          updatedBy: 'trigger' as const,
+        })
+      } catch (updateError) {
+        console.error('scrapingStatus更新にも失敗:', bookId, updateError)
+      }
     }
 
     // グループ count 同期
