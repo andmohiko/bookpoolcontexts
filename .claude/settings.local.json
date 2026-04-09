@@ -15,7 +15,8 @@
       "Bash(firebase firestore:indexes)",
       "Bash(pnpm web build)",
       "Bash(pnpm functions pre-build)",
-      "Bash(firebase functions:log --only onCreateBook)"
+      "Bash(firebase functions:log --only onCreateBook)",
+      "Bash(xargs ls:*)"
     ],
     "deny": [],
     "ask": []

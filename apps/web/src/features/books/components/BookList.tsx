@@ -6,11 +6,12 @@ import { useBooks } from '@/features/books/hooks/useBooks'
 
 type BookListProps = {
   tag?: string
+  group?: string
   onClickBook: (book: Book) => void
 }
 
-export const BookList = ({ tag, onClickBook }: BookListProps) => {
-  const { books, isLoading, isLoadingMore, hasMore, loadMore } = useBooks(tag)
+export const BookList = ({ tag, group, onClickBook }: BookListProps) => {
+  const { books, isLoading, isLoadingMore, hasMore, loadMore } = useBooks(tag, group)
   const sentinelRef = useRef<HTMLDivElement>(null)
 
   // 無限スクロール

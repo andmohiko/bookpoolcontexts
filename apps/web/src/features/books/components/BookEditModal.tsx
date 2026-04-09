@@ -16,6 +16,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { GroupSelectDropdown } from '@/features/groups/components/GroupSelectDropdown'
 import { TagSuggestionDropdown } from '@/features/tags/components/TagSuggestionDropdown'
 import { DeleteBookAlertDialog } from '@/features/books/components/DeleteBookAlertDialog'
 import { useUpdateBookMutation } from '@/features/books/hooks/useUpdateBookMutation'
@@ -62,6 +63,7 @@ export const BookEditModal = ({
   })
 
   const tags = watch('tags')
+  const groups = watch('groups')
   const purchasedBy = watch('purchasedBy')
 
   useEffect(() => {
@@ -204,6 +206,14 @@ export const BookEditModal = ({
                 </label>
               ))}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>グループ</Label>
+            <GroupSelectDropdown
+              selectedGroups={groups}
+              onChange={(labels) => setValue('groups', labels)}
+            />
           </div>
 
           <div className="space-y-2">

@@ -21,8 +21,9 @@ import { usePWAInstall } from '@/hooks/usePWAInstall'
 export const SideNav = () => {
   const { tags, isLoading: isLoadingTags } = useTags()
   const { groups, isLoading: isLoadingGroups } = useGroups()
-  const search = useSearch({ strict: false }) as { tag?: string }
+  const search = useSearch({ strict: false }) as { tag?: string; group?: string }
   const selectedTag = search.tag ?? null
+  const selectedGroup = search.group ?? null
   const { canInstall, promptInstall } = usePWAInstall()
 
   return (
@@ -35,7 +36,7 @@ export const SideNav = () => {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={selectedTag === null}
+                  isActive={selectedTag === null && selectedGroup === null}
                   tooltip="すべて"
                   className="data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90"
                 >
@@ -84,11 +85,22 @@ export const SideNav = () => {
                   ))
                 : groups.map((group) => (
                     <SidebarMenuItem key={group.groupId}>
-                      <SidebarMenuButton tooltip={group.label}>
-                        <FolderOpen />
-                        <span>{group.label}</span>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={selectedGroup === group.label}
+                        tooltip={group.label}
+                        className="data-[active=true]:font-bold data-[active=true]:text-foreground"
+                      >
+                        <Link to="/" search={{ group: group.label }}>
+                          <FolderOpen />
+                          <span>{group.label}</span>
+                        </Link>
                       </SidebarMenuButton>
-                      <SidebarMenuBadge>{group.count}</SidebarMenuBadge>
+                      <SidebarMenuBadge
+                        className={selectedGroup === group.label ? 'text-foreground' : ''}
+                      >
+                        {group.count}
+                      </SidebarMenuBadge>
                     </SidebarMenuItem>
                   ))}
               <SidebarMenuItem>

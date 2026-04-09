@@ -38,6 +38,7 @@ export const useCreateBookMutation = (): UseCreateBookMutationReturn => {
         isRead: false,
         createdAt: serverTimestamp,
         updatedAt: serverTimestamp,
+        updatedBy: 'user' as const,
       }
       await createBookOperation(uid, dto)
       toast.success('本を登録しました')

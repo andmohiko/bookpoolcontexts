@@ -15,7 +15,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { GroupCheckboxList } from '@/features/groups/components/GroupCheckboxList'
+import { GroupSelectDropdown } from '@/features/groups/components/GroupSelectDropdown'
 import { TagSuggestionDropdown } from '@/features/tags/components/TagSuggestionDropdown'
 import { useCreateBookMutation } from '@/features/books/hooks/useCreateBookMutation'
 import {
@@ -203,9 +203,9 @@ export const BookRegistrationModal = ({
 
           <div className="space-y-2">
             <Label>グループ</Label>
-            <GroupCheckboxList
-              selectedGroupIds={groups}
-              onChange={(groupIds) => setValue('groups', groupIds)}
+            <GroupSelectDropdown
+              selectedGroups={groups}
+              onChange={(labels) => setValue('groups', labels)}
             />
           </div>
 

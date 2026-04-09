@@ -4,7 +4,9 @@ import type { DocumentSnapshot } from 'firebase/firestore'
 import {
   type FetchResultWithPagination,
   PAGE_SIZE,
+  fetchBooksByGroupOperation,
   fetchBooksOperation,
+  subscribeBooksByGroupOperation,
   subscribeBooksOperation,
 } from '@/infrastructure/firestore/books'
 import { useFirebaseAuthContext } from '@/providers/FirebaseAuthProvider'
@@ -19,7 +21,7 @@ export type UseBooksReturn = {
   loadMore: () => Promise<void>
 }
 
-export const useBooks = (tag?: string): UseBooksReturn => {
+export const useBooks = (tag?: string, group?: string): UseBooksReturn => {
   const { uid } = useFirebaseAuthContext()
   const [firstPageBooks, setFirstPageBooks] = useState<Array<Book>>([])
   const [additionalBooks, setAdditionalBooks] = useState<Array<Book>>([])
@@ -36,6 +38,16 @@ export const useBooks = (tag?: string): UseBooksReturn => {
     setIsLoading(true)
     setAdditionalBooks([])
     lastDocRef.current = null
+
+    if (group) {
+      // グループフィルタ時はリアルタイム購読
+      const unsubscribe = subscribeBooksByGroupOperation(uid, group, PAGE_SIZE, (books) => {
+        setFirstPageBooks(books)
+        setHasMore(books.length === PAGE_SIZE)
+        setIsLoading(false)
+      })
+      return () => unsubscribe()
+    }
 
     if (tag) {
       // タグフィルタ時はfetchで取得（subscribeはタグフィルタ非対応のため）
@@ -60,22 +72,17 @@ export const useBooks = (tag?: string): UseBooksReturn => {
     })
 
     return () => unsubscribe()
-  }, [uid, tag])
+  }, [uid, tag, group])
 
   const loadMore = useCallback(async (): Promise<void> => {
     if (!uid || !hasMore || isLoadingMore) return
 
     setIsLoadingMore(true)
     try {
-      const allBooks = [...firstPageBooks, ...additionalBooks]
       const lastDoc = lastDocRef.current ?? null
-      // lastDocがない場合はfetchで最初のページ末尾を基準にする
-      const result = await fetchBooksOperation(
-        uid,
-        PAGE_SIZE,
-        lastDoc,
-        tag,
-      )
+      const result = group
+        ? await fetchBooksByGroupOperation(uid, group, PAGE_SIZE, lastDoc)
+        : await fetchBooksOperation(uid, PAGE_SIZE, lastDoc, tag)
       setAdditionalBooks((prev) => [...prev, ...result.items])
       lastDocRef.current = result.lastDoc
       setHasMore(result.hasMore)
@@ -84,7 +91,7 @@ export const useBooks = (tag?: string): UseBooksReturn => {
     } finally {
       setIsLoadingMore(false)
     }
-  }, [uid, hasMore, isLoadingMore, firstPageBooks, additionalBooks, tag])
+  }, [uid, hasMore, isLoadingMore, firstPageBooks, additionalBooks, tag, group])
 
   return {
     books: [...firstPageBooks, ...additionalBooks],

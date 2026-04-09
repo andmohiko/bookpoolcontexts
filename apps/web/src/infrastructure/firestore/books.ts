@@ -112,12 +112,12 @@ export const subscribeBooksOperation = (
 /** グループに属する本の一覧を取得する（ページネーション対応） */
 export const fetchBooksByGroupOperation = async (
   uid: Uid,
-  groupId: string,
+  groupLabel: string,
   pageSize: number,
   lastDocument: DocumentSnapshot | null,
 ): Promise<FetchResultWithPagination<Book>> => {
   const baseConstraints = [
-    where('groups', 'array-contains', groupId),
+    where('groups', 'array-contains', groupLabel),
     orderBy('createdAt', 'desc'),
   ]
   const constraints = lastDocument
@@ -133,6 +133,27 @@ export const fetchBooksByGroupOperation = async (
   const hasMore = snapshot.docs.length === pageSize
 
   return { items, lastDoc, hasMore }
+}
+
+/** グループに属する本の一覧をリアルタイム購読する */
+export const subscribeBooksByGroupOperation = (
+  uid: Uid,
+  groupLabel: string,
+  pageSize: number,
+  setter: (books: Array<Book>) => void,
+): Unsubscribe => {
+  const q = query(
+    booksRef(uid),
+    where('groups', 'array-contains', groupLabel),
+    orderBy('createdAt', 'desc'),
+    limit(pageSize),
+  )
+  return onSnapshot(q, (snapshot) => {
+    const books = snapshot.docs.map(
+      (d) => ({ bookId: d.id, ...convertDate(d.data(), dateColumns) }) as Book,
+    )
+    setter(books)
+  })
 }
 
 /** 本を作成する */
