@@ -26,10 +26,12 @@
 | 用語 | 定義 |
 |------|------|
 | Book | 読みたい本として登録された1冊のデータ |
-| Group | 文脈やテーマごとに本をまとめるグルーピング単位 |
+| Group | 文脈やテーマごとに本をまとめるグルーピング単位（文脈グループ） |
 | Tag | 本のジャンル（小説、新書、技術書など）を分類するラベル |
 | Location | 本が読める場所（図書館、ブックオフ、本屋、Kindle Unlimitedなど） |
 | PurchasedBy | 本の購入場所・手段（物理本、Kindle、オフィスなど） |
+| ScrapingStatus | Amazonからの情報取得状態を表すステータス（`scraping` / `completed` / `failed` / `skipped`） |
+| UpdatedBy | Bookドキュメント更新の操作主（`user` / `trigger`）。連鎖トリガー防止のために使用する |
 
 ---
 
@@ -82,21 +84,25 @@
 | 著者 (author) | 自動取得 | string \| null | Cloud Functionsが自動取得。登録時はnull |
 | 表紙画像URL (coverImageUrl) | 自動取得 | string \| null | Cloud Functionsが自動取得。登録時はnull |
 | ページ数 (pages) | 自動取得 | number \| null | Cloud Functionsが自動取得。登録時はnull |
-| AmazonURL (amazonUrl) | **必須** | string | ユーザーがAmazonのURLを直接入力 |
-| タグ (tags) | 任意 | string[] | 各タグ50文字以下、最大10個 |
+| AmazonURL (amazonUrl) | 条件付き必須 | string | URL または amazonHtml のいずれかが必須。入力時は有効なURL形式 |
+| AmazonページのHTML (amazonHtml) | 条件付き必須 | string | 登録画面専用のフォーム項目。DBには保存しない。詳細は FR-BOOK-002 参照 |
+| タグ (tags) | 任意 | string[] | 各タグ50文字以下、最大10個。`normalizeTagLabel` で正規化・重複除去される |
 | どこで見つけたか (foundBy) | 任意 | string | 500文字以下 |
 | どこで読めるか (location) | 任意 | string | 200文字以下 |
 | 購入場所 (purchasedBy) | 任意 | string[] | 選択肢: 物理本, Kindle, オフィス |
 | メモ (note) | 任意 | string | 2000文字以下 |
-| グループ (groups) | 任意 | string[] | 既存グループIDから選択 |
+| グループ (groups) | 任意 | string[] | 既存グループ label の配列（label ベースで管理） |
+| 読了フラグ (isRead) | 任意 | boolean | 登録時点で読了済みとしてマークすることも可能 |
 
 **処理フロー:**
-1. ユーザーがAmazonのURLとタグ・グループ等のメタ情報を入力
-2. クライアント側でZodによるバリデーション
-3. Firestoreに本のデータを保存（title: null, author: null, coverImageUrl: null, pages: null, amazonUrl付き）
-4. タグ・グループのカウントを更新
-5. 成功後、一覧画面へ遷移
-6. Cloud Functions（onCreateBook トリガー）がamazonUrlからAmazon詳細ページをスクレイピングし、タイトル・著者名・表紙画像URL・ページ数を自動取得してFirestoreを更新
+1. ユーザーがモーダル上で「AmazonのURL」または「AmazonページのHTML」と、タグ・グループ等のメタ情報を入力する（どちらか一方あれば登録可能）
+2. クライアント側で Zod によるバリデーション（URL 形式・HTML 有無の相互補完チェック）
+3. `amazonHtml` が入力されていれば、クライアント側で `parseAmazonHtml` により title / author / coverImageUrl / pages を抽出し、`scrapingStatus: 'skipped'` として保存する（Cloud Functions はスクレイピングを実行しない）
+4. `amazonHtml` が入力されていなければ、title / author / coverImageUrl / pages は `null`、`scrapingStatus: 'scraping'` として保存する（Cloud Functions が後続で自動取得）
+5. `updatedBy: 'user'` を明示して Firestore に保存する
+6. モーダルを閉じ、一覧画面で楽観的にカード表示される
+7. Cloud Functions の `onCreateBook` トリガーが、`scrapingStatus !== 'skipped'` の場合に限り Amazon 詳細ページをスクレイピングして結果を反映する
+8. 同じ `onCreateBook` トリガーが、入力された tags/groups の count をサブコレクションに同期する（不在のタグは新規作成）
 
 #### FR-BOOK-002: AmazonURLからの本情報自動取得
 
@@ -106,12 +112,34 @@
 | 優先度 | 必須 |
 
 **詳細要件:**
-- Cloud Functions の onCreateBook トリガーが、保存された amazonUrl を使ってAmazon詳細ページをスクレイピングする
-- タイトル（title）、著者名（author）、表紙画像URL（coverImageUrl）、ページ数（pages）を自動取得し、Firestoreの該当Bookドキュメントを更新する
-- 取得できなかったフィールドはnullのまま維持する（エラーにはしない）
-- スクレイピングにはpuppeteer-core + @sparticuz/chromiumを使用する
-- 情報取得はFirebase Functions（Firestoreトリガー）経由で実行する
-- Amazon検索API（POST /books/search）は廃止。クライアント側での検索は行わない
+- Cloud Functions の `onCreateBook` トリガーが、保存された `amazonUrl` を使って Amazon 詳細ページをスクレイピングする
+- タイトル（title）、著者名（author）、表紙画像URL（coverImageUrl）、ページ数（pages）を自動取得し、Firestore の該当 Book ドキュメントを更新する
+- 取得成否に応じて `scrapingStatus` を遷移させる：
+  - 登録直後は `scraping`
+  - 少なくとも1つのフィールドが取得できれば `completed`
+  - すべて取得できなかった場合は `failed`
+  - クライアントが HTML から取得済みで登録した場合は `skipped`（スクレイピング自体を実行しない）
+- 取得処理の更新は `updatedBy: 'trigger'` を明示して保存し、`onUpdateBook` トリガーの連鎖発火を防ぐ
+- 取得できなかったフィールドは `null` のまま維持する（エラーにはしない）
+- スクレイピングには puppeteer-core + @sparticuz/chromium を使用する（Cloud Functions のメモリは 2GiB 設定）
+- Amazon 検索 API（POST /books/search）は廃止。クライアント側での検索は行わない
+
+**HTML 直接入力によるフォールバック:**
+- スクレイピングが Amazon 側のブロックなどで失敗することを考慮し、本の登録モーダルには「Amazon 詳細ページのHTML」フィールドを用意する
+- ユーザーがブラウザで Amazon ページを開き「ページのソース表示」から取得した HTML を貼り付けると、クライアントの `parseAmazonHtml` ユーティリティがタイトル・著者・表紙画像URL・ページ数を抽出する
+- HTML から取得できた情報をそのまま Firestore に保存し、`scrapingStatus: 'skipped'` とする。Cloud Functions 側のスクレイピングは実行されない
+
+#### FR-BOOK-006: 本の情報再取得（リフェッチ）
+
+| 項目 | 内容 |
+|------|------|
+| 概要 | スクレイピング失敗状態の本について、ユーザーの手動操作で再度 Amazon から情報を取得し直す機能 |
+| 優先度 | 必須 |
+
+**詳細要件:**
+- 一覧画面の BookCard 上で `scrapingStatus === 'failed'` の本は「取得失敗」バッジと再取得ボタンを表示する
+- 再取得ボタンを押すと、クライアントは該当 Book の `scrapingStatus` を `'scraping'` に更新する（`updatedBy: 'user'`）
+- Cloud Functions の `onUpdateBook` トリガーが「`scrapingStatus` が `'scraping'` に遷移した」ことを検知し、`scrapeAndUpdateBook` を実行して結果に応じて `completed` / `failed` に再遷移させる
 
 #### FR-BOOK-003: 本の編集
 
@@ -121,10 +149,11 @@
 | 優先度 | 必須 |
 
 **詳細要件:**
-- 登録済みの本の全フィールドを編集可能とする
+- 一覧画面の BookCard をクリックすると BookEditModal が開き、タグ・グループ・foundBy・location・購入場所・メモ・読了フラグを編集できる
+- title / author / coverImageUrl / pages / amazonUrl はスクレイピング結果に依存するためユーザー編集の対象外（モーダル上部に表紙・タイトル・著者を表示のみ）
 - 更新日時（updatedAt）を自動更新する
-- タグ・グループの変更時はカウントを適切に更新する
-- 楽観的更新（Optimistic Update）を実装し、UXを向上させる
+- `updatedBy: 'user'` を明示して保存する（トリガーによる更新と区別するため）
+- タグ・グループの変更時はカウントを Cloud Functions（`onUpdateBook`）が差分同期する
 
 #### FR-BOOK-004: 本の削除
 
@@ -134,10 +163,10 @@
 | 優先度 | 必須 |
 
 **詳細要件:**
-- 確認ダイアログを表示後、本を削除する
+- BookEditModal から「削除」ボタンで AlertDialog を表示し、確認後に本を削除する
 - 削除は物理削除（復元不可）とする
-- 削除後は一覧画面へ遷移する
-- 関連するタグ・グループのカウントを更新する
+- 削除後はモーダルを閉じ、一覧画面に即時反映される
+- 関連するタグ・グループのカウントは Cloud Functions（`onDeleteBook`）が自動同期する。`count` が 0 になるタグはドキュメント自体を削除する
 
 #### FR-BOOK-005: 読了フラグ
 
@@ -147,9 +176,9 @@
 | 優先度 | 必須 |
 
 **詳細要件:**
-- 一覧画面・詳細画面から読了フラグをトグルできる
-- 読了済みの本は一覧画面で視覚的に区別される
-- デフォルトでは未読の本のみ表示し、読了済みも含める切り替えが可能
+- 本の登録モーダル・編集モーダルの両方から読了フラグをトグルできる
+- 読了済みの本は BookCard の右上に緑色のチェックバッジで視覚的に区別される
+- 設定画面で「読了済みの本を一覧に表示しない」をトグルでき、設定は localStorage で永続化される（FR-SETTINGS-002）
 
 ---
 
@@ -165,9 +194,10 @@
 **詳細要件:**
 - ログイン後のデフォルト画面として本の一覧を表示する
 - 登録日時の降順（最新順）でソートする
-- 無限スクロールによるページネーションを実装する（1回あたり20件）
-- 各本はタイトル、著者、表紙画像、タグ、登録日時を表示する
-- TanStack Queryによるデータフェッチとキャッシュ管理
+- カードグリッド表示（モバイル 3 列、sm 4 列、md 5 列、lg 6 列）で、1 カード = 1 冊
+- 各 BookCard は表紙画像・タグ・読了バッジ・スクレイピング状態（取得中スピナー／取得失敗リトライボタン）を表示する
+- Firestore の `onSnapshot` によるリアルタイム購読でデータを同期する（上限 100 件）
+- 画面右下の FAB から本の登録モーダルを開ける。キーボードショートカット `c` でも同様にモーダルを開ける
 
 #### FR-LIST-002: タグによるフィルタリング
 
@@ -177,9 +207,10 @@
 | 優先度 | 必須 |
 
 **詳細要件:**
-- タグ一覧をサイドバーまたはフィルタUIで表示する
-- タグを選択すると、そのタグが付いた本のみ表示する
-- 各タグに登録されている本の件数を表示する
+- サイドナビ（SideNav）にタグ一覧を件数付きで表示する
+- ホーム画面上部にもタグチップのフィルタバーを表示する
+- タグを選択すると URL の search params `?tag=<label>` が更新され、そのタグが付いた本のみ表示する
+- 現在選択中のタグはハイライト表示される
 
 #### FR-LIST-003: グループビュー
 
@@ -189,9 +220,22 @@
 | 優先度 | 必須 |
 
 **詳細要件:**
-- グループ一覧画面でグループを選択すると、そのグループに属する本の一覧を表示する
-- 各グループに登録されている本の件数を表示する
-- グループ内でも読了/未読の切り替えが可能
+- サイドナビ（SideNav）にグループ一覧を件数付きで表示する（「文脈グループ」セクション）
+- グループを選択するとホーム画面に `?group=<label>` が付与され、そのグループに属する本の一覧を表示する
+- ホーム画面とは別にグループ管理画面（`/groups`）を提供し、グループの新規作成・編集・削除ができる
+- グループフィルタ中でも読了フラグによる絞り込みは有効
+
+#### FR-LIST-004: 読了済みの本の非表示設定
+
+| 項目 | 内容 |
+|------|------|
+| 概要 | 読了済みの本を一覧から除外する機能 |
+| 優先度 | 必須 |
+
+**詳細要件:**
+- 設定画面から「読了済みの本を一覧に表示しない」トグルを切り替えられる
+- トグル状態は localStorage（`hideReadBooks`）に永続化される
+- ホーム画面・タグフィルタ・グループフィルタのすべてで、設定が ON の場合は `isRead === true` の本を一覧から除外する
 
 ---
 
@@ -234,9 +278,10 @@
 | 優先度 | 必須 |
 
 **詳細要件:**
-- 本の詳細画面・編集画面からグループを追加・除去できる
-- 1冊の本は複数のグループに所属できる
-- グループのカウントを自動更新する
+- 本の登録モーダル・編集モーダルの GroupSelectDropdown からグループを追加・除去できる
+- 1 冊の本は複数のグループに所属できる
+- グループ側の `count` フィールドは Cloud Functions の `onCreateBook` / `onUpdateBook` / `onDeleteBook` / `onDeleteGroup` トリガーが差分で自動同期する
+- グループが削除された場合、`onDeleteGroup` トリガーがそのグループに属していた全ての本の `groups` フィールドから該当 label を除去する
 
 ---
 
@@ -250,20 +295,71 @@
 | 優先度 | 必須 |
 
 **詳細要件:**
-- 本の登録・編集時にタグを自由入力で追加できる
-- 既存タグの候補をオートコンプリートで表示する
-- 新規タグは本の保存時に自動作成される
+- 本の登録・編集モーダルでタグを自由入力で追加できる（Enter キーで確定）
+- TagSuggestionDropdown により、入力中のテキストにマッチする既存タグをオートコンプリートで表示する
+- タグ label は `normalizeTagLabel`（前後空白除去・全角→半角変換など）で正規化され、重複は弾く
+- タグの Firestore ドキュメントはクライアントからは作成しない。Cloud Functions の `onCreateBook` / `onUpdateBook` トリガーが、本の保存時に未知のタグを `count: 1` で新規作成する（Firestore ルールでもクライアントからの `create` を禁止している）
 
 #### FR-TAG-002: タグの編集・削除
 
 | 項目 | 内容 |
 |------|------|
 | 概要 | 既存タグの名前変更・削除機能 |
-| 優先度 | 低 |
+| 優先度 | 必須 |
 
 **詳細要件:**
-- タグ名を変更できる（変更時は関連する全ての本のタグも更新する）
-- タグを削除できる（削除時は関連する全ての本からそのタグを除去する）
+- 専用のタグ管理画面（`/tags`）を提供する
+- タグ label を変更でき、変更時は関連する全ての本の `tags` フィールドも一括更新する
+- タグを削除でき、Cloud Functions の `onDeleteTag` トリガーが関連する全ての本からその label を除去する
+- タグの `count` フィールドは Cloud Functions（`onCreateBook` / `onUpdateBook` / `onDeleteBook`）が差分で自動同期する。`count` が 0 になるタグはドキュメント自体が削除される
+
+---
+
+### 2.6 設定機能
+
+#### FR-SETTINGS-001: テーマモードの切り替え
+
+| 項目 | 内容 |
+|------|------|
+| 概要 | ライト／ダーク／デバイスに合わせる の 3 モードを切り替え |
+| 優先度 | 必須 |
+
+**詳細要件:**
+- 設定画面にてテーマモードを選択できる
+- 選択値は localStorage に永続化され、アプリ起動時に復元される
+- `auto` モードの場合は OS の `prefers-color-scheme` に従う
+
+#### FR-SETTINGS-002: 読了済みの本の非表示設定
+
+FR-LIST-004 を参照。
+
+#### FR-SETTINGS-003: ログアウト
+
+設定画面にログアウトボタンを設置し、Firebase Authentication のセッションをクリアする。
+
+---
+
+### 2.7 PWA 対応
+
+#### FR-PWA-001: インストール可能な PWA としての提供
+
+| 項目 | 内容 |
+|------|------|
+| 概要 | Webアプリをホーム画面にインストール可能にする |
+| 優先度 | 必須 |
+
+**詳細要件:**
+- Service Worker（`sw.js`）とマニフェスト、アイコン（logo192.png / logo512.png）を提供する
+- `beforeinstallprompt` イベントをフックしてインストール可能な環境ではサイドナビに「アプリをインストール」ボタンを表示する
+- インストールボタン押下で `prompt()` を呼び出しネイティブのインストールフローを起動する
+
+---
+
+### 2.8 キーボードショートカット
+
+| ショートカット | 動作 |
+|---------------|------|
+| `c` | 本の登録モーダルを開く（登録モーダルが開いていないとき） |
 
 ---
 
@@ -327,15 +423,17 @@ firestore/
 │       │       ├── coverImageUrl: string | null
 │       │       ├── createdAt: Timestamp
 │       │       ├── foundBy: string
-│       │       ├── groups: string[]
+│       │       ├── groups: string[]         // group label の配列
 │       │       ├── isRead: boolean
 │       │       ├── location: string
 │       │       ├── note: string
 │       │       ├── pages: number | null
 │       │       ├── purchasedBy: string[]
-│       │       ├── tags: string[]
+│       │       ├── scrapingStatus: 'scraping' | 'completed' | 'failed' | 'skipped'
+│       │       ├── tags: string[]           // tag label の配列
 │       │       ├── title: string | null
-│       │       └── updatedAt: Timestamp
+│       │       ├── updatedAt: Timestamp
+│       │       └── updatedBy: 'user' | 'trigger'
 │       ├── groups/  (サブコレクション)
 │       │   └── {groupId}/
 │       │       ├── count: number
@@ -346,7 +444,7 @@ firestore/
 │           └── {tagId}/
 │               ├── count: number
 │               ├── createdAt: Timestamp
-│               ├── label: string
+│               ├── label: string           // normalizeTagLabel で正規化済み
 │               └── updatedAt: Timestamp
 ```
 
@@ -363,103 +461,105 @@ firestore/
 
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
-| id | string | 自動生成ID（ドキュメントID） |
-| amazonUrl | string | Amazon詳細ページのURL（ユーザーが直接入力） |
-| author | string \| null | 本の著者（Cloud Functionsが自動取得、初期値null） |
-| coverImageUrl | string \| null | 表紙の画像URL（Cloud Functionsが自動取得、初期値null） |
+| bookId | string | 自動生成ID（ドキュメントID） |
+| amazonUrl | string | Amazon詳細ページのURL（ユーザー入力。HTML 直接入力時は空文字の場合あり） |
+| author | string \| null | 本の著者（Cloud Functions もしくはクライアントの `parseAmazonHtml` が取得、初期値 null） |
+| coverImageUrl | string \| null | 表紙の画像URL（Cloud Functions もしくは `parseAmazonHtml` が取得、初期値 null） |
 | createdAt | Timestamp | 登録日時 |
 | foundBy | string | どこで見つけたか（誰に勧められたかなど） |
-| groups | string[] | 所属するグループIDの配列 |
+| groups | string[] | 所属するグループの label 配列 |
 | isRead | boolean | 読了かどうか |
 | location | string | どこで読めるか（図書館、ブックオフ、本屋、Kindle Unlimitedなど） |
 | note | string | 自由記述のメモ |
-| pages | number \| null | ページ数（Cloud Functionsが自動取得、初期値null） |
+| pages | number \| null | ページ数（Cloud Functions もしくは `parseAmazonHtml` が取得、初期値 null） |
 | purchasedBy | string[] | 購入場所（物理本、Kindle、オフィス） |
-| tags | string[] | ジャンルタグ |
-| title | string \| null | 本のタイトル（Cloud Functionsが自動取得、初期値null） |
+| scrapingStatus | `'scraping' \| 'completed' \| 'failed' \| 'skipped'` | Amazon情報取得の進行状態 |
+| tags | string[] | タグ label の配列（`normalizeTagLabel` で正規化） |
+| title | string \| null | 本のタイトル（Cloud Functions もしくは `parseAmazonHtml` が取得、初期値 null） |
 | updatedAt | Timestamp | 更新日時 |
+| updatedBy | `'user' \| 'trigger'` | 直近の更新操作主。Firestore ルールではクライアント書き込み時 `'user'` のみ許可する |
 
 ### 4.4 groups サブコレクション
 
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
-| id | string | 自動生成ID（ドキュメントID） |
-| count | number | グループに登録されている本の数 |
+| groupId | string | 自動生成ID（ドキュメントID） |
+| count | number | グループに登録されている本の数（Cloud Functions により差分同期） |
 | createdAt | Timestamp | 作成日時 |
-| label | string | グループ名 |
+| label | string | グループ名（本の `groups` 配列で参照されるキー） |
 | updatedAt | Timestamp | 更新日時 |
 
 ### 4.5 tags サブコレクション
 
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
-| id | string | 自動生成ID（ドキュメントID） |
-| count | number | タグに登録されている本の数 |
+| tagId | string | 自動生成ID（ドキュメントID） |
+| count | number | タグに登録されている本の数（Cloud Functions により差分同期） |
 | createdAt | Timestamp | 作成日時 |
-| label | string | タグ名 |
+| label | string | タグ名（`normalizeTagLabel` で正規化済み） |
 | updatedAt | Timestamp | 更新日時 |
 
-### 4.6 TypeScript型定義
+> ℹ️ `tags` コレクションのドキュメントはクライアントからは作成しない。Cloud Functions の Admin SDK 経由でのみ作成される（Firestore ルールでクライアント `create` を禁止）。
+
+### 4.6 TypeScript 型定義
+
+共通型は `packages/common/src/entities/` に配置し、`@bookpoolcontexts/common` として web と functions の両方から参照する。Entity 型と DTO 型を分離し、タイムスタンプは Entity 側では `Date`、DTO 側では `FieldValue` で表現する（Firestore 実装ルールに準拠）。
 
 ```typescript
-// types/book.ts
-import { Timestamp } from 'firebase/firestore';
+// packages/common/src/entities/Book.ts
+import type { FieldValue } from 'firebase/firestore'
 
-export interface Book {
-  id: string;
-  amazonUrl: string;
-  author: string | null;
-  coverImageUrl: string | null;
-  createdAt: Timestamp;
-  foundBy: string;
-  groups: string[];
-  isRead: boolean;
-  location: string;
-  note: string;
-  pages: number | null;
-  purchasedBy: string[];
-  tags: string[];
-  title: string | null;
-  updatedAt: Timestamp;
+export const bookCollection = 'books' as const
+export type BookId = string
+
+export type UpdatedBy = 'trigger' | 'user'
+export type ScrapingStatus = 'scraping' | 'completed' | 'failed' | 'skipped'
+
+export type Book = {
+  bookId: BookId
+  amazonUrl: string
+  author: string | null
+  coverImageUrl: string | null
+  createdAt: Date
+  foundBy: string
+  groups: string[]
+  isRead: boolean
+  location: string
+  note: string
+  pages: number | null
+  purchasedBy: string[]
+  scrapingStatus: ScrapingStatus
+  tags: string[]
+  title: string | null
+  updatedAt: Date
+  updatedBy: UpdatedBy
 }
 
-export interface BookInput {
-  amazonUrl: string;
-  foundBy?: string;
-  groups?: string[];
-  location?: string;
-  note?: string;
-  purchasedBy?: string[];
-  tags?: string[];
+export type CreateBookDto = Omit<Book, 'bookId' | 'createdAt' | 'updatedAt'> & {
+  createdAt: FieldValue
+  updatedAt: FieldValue
 }
 
-export interface Group {
-  id: string;
-  count: number;
-  createdAt: Timestamp;
-  label: string;
-  updatedAt: Timestamp;
-}
-
-export interface GroupInput {
-  label: string;
-}
-
-export interface Tag {
-  id: string;
-  count: number;
-  createdAt: Timestamp;
-  label: string;
-  updatedAt: Timestamp;
-}
-
-export interface User {
-  uid: string;
-  createdAt: Timestamp;
-  email: string;
-  updatedAt: Timestamp;
+export type UpdateBookDto = {
+  amazonUrl?: Book['amazonUrl']
+  author?: Book['author']
+  coverImageUrl?: Book['coverImageUrl']
+  foundBy?: Book['foundBy']
+  groups?: Book['groups']
+  isRead?: Book['isRead']
+  location?: Book['location']
+  note?: Book['note']
+  pages?: Book['pages']
+  purchasedBy?: Book['purchasedBy']
+  scrapingStatus?: Book['scrapingStatus']
+  tags?: Book['tags']
+  title?: Book['title']
+  updatedAt: FieldValue
+  updatedBy: UpdatedBy
 }
 ```
+
+Group / Tag / User も同様のパターンで `groupId` / `tagId` / `uid` を ID フィールドとして持ち、CreateDto / UpdateDto を定義する。Cloud Functions 側（firebase-admin）用には `UpdateBookDtoFromAdmin` / `UpdateGroupDtoFromAdmin` / `CreateTagDtoFromAdmin` / `UpdateTagDtoFromAdmin` などの Admin 用 DTO を別途定義している。
 
 ---
 
@@ -469,28 +569,29 @@ export interface User {
 
 | 画面ID | 画面名 | パス | 認証 | 概要 |
 |--------|--------|------|------|------|
-| SCR-001 | ログイン画面 | `/login` | 不要 | Googleログインボタンを表示 |
-| SCR-002 | 本の一覧画面 | `/` | 必要 | 登録した本を一覧表示（ホーム） |
-| SCR-003 | 本の登録画面 | `/new` | 必要 | 新規の本の登録フォーム |
-| SCR-004 | 本の詳細画面 | `/book/$bookId` | 必要 | 本の詳細表示と編集 |
-| SCR-005 | グループ一覧画面 | `/groups` | 必要 | グループの一覧表示 |
-| SCR-006 | グループ詳細画面 | `/group/$groupId` | 必要 | グループに属する本の一覧表示 |
-| SCR-007 | 設定画面 | `/settings` | 必要 | ユーザー設定 |
+| SCR-001 | ログイン画面 | `/login` | 不要 | Google ログインボタンを表示 |
+| SCR-002 | 本の一覧画面（ホーム） | `/` | 必要 | 登録した本のカードグリッド表示。`?tag=` / `?group=` でフィルタ |
+| SCR-003 | グループ管理画面 | `/groups` | 必要 | グループの一覧、作成、編集、削除 |
+| SCR-004 | タグ管理画面 | `/tags` | 必要 | タグの一覧、編集、削除 |
+| SCR-005 | 設定画面 | `/settings` | 必要 | テーマ、読了非表示、ログアウト |
+| SCR-006 | About 画面 | `/about` | 必要 | アプリの説明 |
+
+> 本の登録／編集／削除は画面遷移ではなくホーム画面上のモーダル（`BookRegistrationModal` / `BookEditModal` / `DeleteBookAlertDialog`）で行う。そのため `/new` や `/book/$bookId`、`/group/$groupId` といった固有の画面ルートは持たない。
 
 ### 5.2 画面遷移図
 
 ```
-[ログイン画面] ──(認証成功)──▶ [本の一覧画面]
+[ログイン画面] ──(認証成功)──▶ [ホーム（本の一覧）]
                                     │
-                    ┌───────────────┼───────────────┐
-                    │               │               │
-                    ▼               ▼               ▼
-              [本の登録]      [本の詳細]     [グループ一覧]
-                    │               │               │
-                    └───────┬───────┘               ▼
-                            │               [グループ詳細]
-                            ▼                       │
-                      [設定画面]              [本の詳細]
+          ┌─────────────┬──────────┼──────────┬────────────┐
+          │             │          │          │            │
+          ▼             ▼          ▼          ▼            ▼
+    (?tag=xxx でフィルタ)         [本の登録/編集モーダル]
+                                                  │
+                                                  ▼
+                                         [削除確認ダイアログ]
+
+  [サイドナビ] ──▶ [グループ管理] / [タグ管理] / [設定] / [About]
 ```
 
 ### 5.3 SCR-001: ログイン画面
@@ -510,87 +611,86 @@ export interface User {
 
 **レイアウト:**
 ```
-┌─────────────────────────────────────────────┐
-│  [Logo]    [Groups]     [Avatar][Logout]    │  ← ヘッダー
-├─────────────────────────────────────────────┤
-│  [タグフィルタ: 全て | 小説 | 技術書 | ...]  │  ← フィルタバー
-│  [未読のみ ☑]                               │
-├─────────────────────────────────────────────┤
-│                                             │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐     │
-│  │ 📕表紙  │  │ 📗表紙  │  │ 📘表紙  │     │  ← カードグリッド
-│  │ タイトル │  │ タイトル │  │ タイトル │     │
-│  │ 著者    │  │ 著者    │  │ 著者    │     │
-│  │ タグ    │  │ タグ    │  │ タグ    │     │
-│  │ 日時    │  │ 日時    │  │ 日時    │     │
-│  └─────────┘  └─────────┘  └─────────┘     │
-│                                             │
-│                    [+]                      │  ← FAB（新規登録）
-└─────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────┐
+│ [SideNav]                    [Header]              │
+│ ┌─────────┐  ┌────────────────────────────────┐    │
+│ │ すべて  │  │ [タグフィルタ: すべて | #小説 ..] │    │
+│ │ ─────── │  ├────────────────────────────────┤    │
+│ │ 文脈    │  │  ┌───┐ ┌───┐ ┌───┐ ┌───┐ ┌───┐ │    │
+│ │ グループ │  │  │📕 │ │🔄 │ │📘 │ │❌ │ │📗 │ │    │
+│ │ ・Web   │  │  │   │ │取得│ │ ✓ │ │再 │ │   │ │    │
+│ │   開発  │  │  │#タグ│ │中 │ │#タ│ │取得│ │#タ│ │    │
+│ │ ・キャリア│  │  └───┘ └───┘ └───┘ └───┘ └───┘ │    │
+│ │ ─────── │  │  ...                            │    │
+│ │ タグ    │  │                          [+ FAB] │    │
+│ │ ・#新書 │  └────────────────────────────────┘    │
+│ │ ・#技術 │                                         │
+│ └─────────┘                                         │
+└────────────────────────────────────────────────────┘
 ```
 
-**コンポーネント:**
-- Header (Logo, Navigation, UserMenu)
-- TagFilter (tag chips)
-- BookCard (coverImage, title, author, tags, date, isRead badge)
-- BookGrid (infinite scroll)
-- FloatingActionButton
+**特徴:**
+- サイドナビのグループ／タグには件数バッジを表示し、選択中の項目はハイライトする
+- BookCard は `scrapingStatus` に応じて表示を切り替える
+  - `scraping`: スピナー + 「取得中...」
+  - `completed`: 表紙画像（なければ `No Image`）
+  - `failed`: 赤い「取得失敗」 + 再取得ボタン
+  - `skipped`: 通常の表示（表紙画像など）
+- 読了済みの本はカード右上に緑色のチェックバッジ
+- タグはカード下部の横スクロール行に表示
 
-### 5.5 SCR-003: 本の登録画面
+**コンポーネント:**
+- SideNav（グループ / タグ / PWA インストール）
+- Header
+- TagFilter（タグチップ）
+- BookList / BookCard（リアルタイム購読）
+- BookRegistrationModal / BookEditModal / DeleteBookAlertDialog
+- FloatingActionButton（`c` キーでも開く）
+
+### 5.5 本の登録モーダル（BookRegistrationModal）
+
+ホーム画面に重ねて表示するダイアログ。URL ベース画面ではない。
 
 **レイアウト:**
 ```
 ┌─────────────────────────────────────────────┐
-│  [←戻る]             本を登録               │
+│  本を登録                                    │
 ├─────────────────────────────────────────────┤
-│                                             │
-│  AmazonのURL *                              │
+│  AmazonのURL                                │
 │  ┌─────────────────────────────────────┐   │
-│  │                                     │   │
+│  │ https://www.amazon.co.jp/dp/...      │   │
+│  └─────────────────────────────────────┘   │
+│  URL または下のHTMLのいずれかを入力してください│
+│                                             │
+│  Amazon詳細ページのHTML（任意）              │
+│  ┌─────────────────────────────────────┐   │
+│  │ <html>...（ソースを貼り付け）        │   │
 │  └─────────────────────────────────────┘   │
 │                                             │
-│  タグ（任意）                               │
-│  ┌─────────────────────────────────────┐   │
-│  │ [小説] [技術書] [+追加]              │   │
-│  └─────────────────────────────────────┘   │
-│                                             │
-│  どこで見つけたか（任意）                   │
-│  ┌─────────────────────────────────────┐   │
-│  │                                     │   │
-│  └─────────────────────────────────────┘   │
-│                                             │
-│  どこで読めるか（任意）                     │
-│  ┌─────────────────────────────────────┐   │
-│  │                                     │   │
-│  └─────────────────────────────────────┘   │
-│                                             │
-│  購入場所（任意）                           │
-│  ☐ 物理本  ☐ Kindle  ☐ オフィス           │
-│                                             │
-│  グループ（任意）                           │
-│  ┌─────────────────────────────────────┐   │
-│  │ [Web開発] [キャリア] [+追加]         │   │
-│  └─────────────────────────────────────┘   │
-│                                             │
-│  メモ（任意）                               │
-│  ┌─────────────────────────────────────┐   │
-│  │                                     │   │
-│  │                                     │   │
-│  └─────────────────────────────────────┘   │
+│  タグ  [小説] [技術書] (サジェスト)          │
+│  どこで見つけたか                            │
+│  どこで読めるか                              │
+│  購入場所 ☐物理本 ☐Kindle ☐オフィス         │
+│  グループ [Web開発] [キャリア] ▼            │
+│  メモ                                        │
+│  読了状態 ☐読み終わった                     │
 │                                             │
 │              [キャンセル] [登録]            │
 └─────────────────────────────────────────────┘
 ```
 
 **コンポーネント:**
-- BookForm
-- AmazonUrlInput
-- TagInput (autocomplete)
-- GroupSelect (multi-select)
-- PurchasedByCheckbox
-- SubmitButton (with loading state)
+- Dialog（`@/components/ui/dialog`）
+- Amazon URL / HTML テキストエリア
+- TagSuggestionDropdown（既存タグのサジェスト）
+- GroupSelectDropdown（複数選択）
+- PurchasedBy Checkbox
+- Read Checkbox
+- Submit / Cancel ボタン
 
-### 5.6 SCR-005: グループ一覧画面
+**本の編集モーダル（BookEditModal）:** 上記に加え、上部にスクレイピング済みの表紙・タイトル・著者を表示する。`amazonUrl` / `amazonHtml` フィールドは持たない。フッターに「削除」ボタンを配置し、押下で `DeleteBookAlertDialog` を開く。
+
+### 5.6 SCR-003: グループ管理画面
 
 **レイアウト:**
 ```
@@ -615,7 +715,26 @@ export interface User {
 **コンポーネント:**
 - GroupList
 - GroupCard (label, count)
-- CreateGroupButton
+- CreateGroupDialog / EditGroupDialog / DeleteGroupAlertDialog
+
+### 5.7 SCR-004: タグ管理画面
+
+- タグの一覧を件数付きで表示する
+- 各タグに編集ボタン・削除ボタンを設置
+- 編集ダイアログで label を変更でき、変更時は関連する本の `tags` を一括更新する
+- 削除は `DeleteTagAlertDialog` で確認後、タグのドキュメントを削除し、Cloud Functions の `onDeleteTag` が関連する本から label を除去する
+
+**コンポーネント:**
+- TagList
+- EditTagDialog
+- DeleteTagAlertDialog
+
+### 5.8 SCR-005: 設定画面
+
+**セクション:**
+- **テーマ**: ライト / ダーク / デバイスに合わせる の 3 択ボタン
+- **本の表示**: 「読了済みの本を一覧に表示しない」チェックボックス
+- **アカウント**: ログアウトボタン
 
 ---
 
@@ -641,51 +760,104 @@ export interface User {
 
 ### 6.2 Firebase Functions エンドポイント
 
+すべてのトリガーは `triggerOnce` ラッパーで冪等性を担保し、リージョンは `asia-northeast1`。スクレイピングを行う関数は `memory: 2GiB`。
+
 #### onCreateBook
 
 | 項目 | 内容 |
 |------|------|
 | 関数名 | `onCreateBook` |
-| タイプ | Firestore onCreateトリガー |
+| タイプ | Firestore onDocumentCreated トリガー |
 | トリガーパス | `users/{uid}/books/{bookId}` |
 
 **処理内容:**
-1. 作成されたBookドキュメントからamazonUrlを取得
-2. AmazonのURLから詳細ページをスクレイピング
-3. タイトル、著者、表紙画像URL、ページ数を取得
-4. Firestoreの該当Bookドキュメントを更新
+1. 作成されたBookの `scrapingStatus` を判定し、`'skipped'` 以外のときだけ `scrapeAndUpdateBook` を呼び出して Amazon 詳細ページをスクレイピング
+2. スクレイピング結果で Book を更新（`updatedBy: 'trigger'`）。成否に応じて `scrapingStatus` を `completed` / `failed` に遷移
+3. 本の `groups` 配列に含まれる各 group label の `count` をインクリメント
+4. 本の `tags` 配列を正規化し、各タグの `count` をインクリメント（未知のタグは `count: 1` で新規作成）
 
-**レスポンス（Firestoreに更新するフィールド）:**
-```typescript
-interface ScrapedBookData {
-  title: string | null;
-  author: string | null;
-  coverImageUrl: string | null;
-  pages: number | null;
-}
-```
+#### onUpdateBook
+
+| 項目 | 内容 |
+|------|------|
+| 関数名 | `onUpdateBook` |
+| タイプ | Firestore onDocumentUpdated トリガー |
+| トリガーパス | `users/{uid}/books/{bookId}` |
+
+**処理内容:**
+1. `after.updatedBy === 'trigger'` の更新は連鎖発火防止のためスキップ
+2. `scrapingStatus` が `'scraping'` に遷移したときは再フェッチとして `scrapeAndUpdateBook` を実行
+3. `groups` の差分を算出し、追加されたラベルの `count` をインクリメント、削除されたラベルの `count` をデクリメント
+4. `tags` の差分を算出し、追加タグは count +1（未知のタグは新規作成）、削除タグは count -1（count<=1 ならドキュメント削除）
+
+#### onDeleteBook
+
+| 項目 | 内容 |
+|------|------|
+| 関数名 | `onDeleteBook` |
+| タイプ | Firestore onDocumentDeleted トリガー |
+| トリガーパス | `users/{uid}/books/{bookId}` |
+
+**処理内容:**
+- 削除された Book の `groups` / `tags` を取り出し、それぞれの count を -1 する
+- count<=1 のタグはドキュメント自体を削除する
+
+#### onDeleteGroup
+
+| 項目 | 内容 |
+|------|------|
+| 関数名 | `onDeleteGroup` |
+| タイプ | Firestore onDocumentDeleted トリガー |
+| トリガーパス | `users/{uid}/groups/{groupId}` |
+
+**処理内容:**
+- 削除された group の label を読み出し、ユーザーの全 Book から当該 label を `groups` 配列から除去する
+
+#### onDeleteTag
+
+| 項目 | 内容 |
+|------|------|
+| 関数名 | `onDeleteTag` |
+| タイプ | Firestore onDocumentDeleted トリガー |
+| トリガーパス | `users/{uid}/tags/{tagId}` |
+
+**処理内容:**
+- 削除された tag の label を読み出し、ユーザーの全 Book から当該 label を `tags` 配列から除去する
+
+#### HTTP API（`api`）
+
+| 項目 | 内容 |
+|------|------|
+| 関数名 | `api` |
+| タイプ | HTTPS（Express / express-promise-router） |
+| リージョン | `asia-northeast1` |
+| メモリ | 2GiB |
+
+**現在のエンドポイント:**
+- `POST /health` — ヘルスチェック用のテストエンドポイント
 
 **備考:**
-- スクレイピングにはpuppeteer-core + @sparticuz/chromiumを使用する
-- 取得できなかったフィールドはnullのまま維持する（エラーにはしない）
-- Amazon検索API（POST /books/search）は廃止
+- スクレイピングには puppeteer-core + @sparticuz/chromium を使用する
+- 取得できなかったフィールドは null のまま維持する（エラーにはしない）
+- Amazon 検索 API（POST /books/search）は廃止
 
-### 6.3 クライアントサイドAPI（Firestore直接アクセス）
+### 6.3 クライアントサイドAPI（Firestore 直接アクセス）
 
-TanStack Queryを使用してFirestoreに直接アクセスする操作:
+クライアントは Firestore の `onSnapshot` によるリアルタイム購読を中心に実装されている（TanStack Query ではなく、Operations 層と `useEffect` ベースのカスタムフックで管理）。データ操作は `apps/web/src/infrastructure/firestore/` の Operations 層にカプセル化する。
 
-| 操作 | Query Key | 説明 |
-|------|-----------|------|
-| 本の一覧取得 | `['books', uid]` | ページネーション付き |
-| 本の詳細取得 | `['book', bookId]` | 単一の本 |
-| 本の作成 | mutation | invalidate: `['books']` |
-| 本の更新 | mutation | invalidate: `['books']`, `['book', id]` |
-| 本の削除 | mutation | invalidate: `['books']` |
-| グループ一覧取得 | `['groups', uid]` | 全件取得 |
-| グループ作成 | mutation | invalidate: `['groups']` |
-| グループ更新 | mutation | invalidate: `['groups']` |
-| グループ削除 | mutation | invalidate: `['groups']`, `['books']` |
-| タグ一覧取得 | `['tags', uid]` | 全件取得 |
+| 操作 | フック / Operation | 説明 |
+|------|--------------------|------|
+| 本の一覧購読 | `useBooks` / `subscribeBooksOperation` | 登録日時降順、上限 100 件 |
+| 本の一覧（タグ絞り込み）| `subscribeBooksByTagOperation` | `tags` 配列に含むものを購読 |
+| 本の一覧（グループ絞り込み）| `subscribeBooksByGroupOperation` | `groups` 配列に含むものを購読 |
+| 本の作成 | `useCreateBookMutation` / `createBookOperation` | `scrapingStatus` 決定はフック側 |
+| 本の更新 | `useUpdateBookMutation` / `updateBookOperation` | `updatedBy: 'user'` を付与 |
+| 本の再フェッチ | `useRefetchBookMutation` | `scrapingStatus` を `'scraping'` に更新 |
+| 本の削除 | `useDeleteBookMutation` | count 同期は `onDeleteBook` トリガーが担当 |
+| グループ一覧購読 | `useGroups` | 全件取得 |
+| グループ作成／更新／削除 | `features/groups/hooks` | label ベース管理 |
+| タグ一覧購読 | `useTags` | 全件取得 |
+| タグ編集／削除 | `features/tags/hooks` | 作成はトリガー経由のみ |
 
 ---
 
@@ -693,25 +865,31 @@ TanStack Queryを使用してFirestoreに直接アクセスする操作:
 
 ### 7.1 フロントエンド
 
-| 技術 | バージョン | 用途 |
-|------|-----------|------|
-| TanStack Start | 1.x | フルスタックReactフレームワーク（SPAモード） |
-| TanStack Router | 1.x | 型安全なファイルベースルーティング |
-| TanStack Query | 5.x | サーバー状態管理、キャッシュ |
-| TypeScript | 5.x | 型安全な開発 |
-| Tailwind CSS | 3.x | ユーティリティファーストCSS |
-| React Hook Form | 7.x | フォーム状態管理 |
-| Zod | 3.x | スキーマバリデーション |
-| Vite | 5.x | ビルドツール（TanStack Start内蔵） |
+| 技術 | 用途 |
+|------|------|
+| TanStack Start | フルスタックReactフレームワーク（SPAモード） |
+| TanStack Router | 型安全なファイルベースルーティング（`/_authed` レイアウトによる認証ガード） |
+| TypeScript | 型安全な開発 |
+| Tailwind CSS | ユーティリティファースト CSS |
+| shadcn/ui | 再利用 UI コンポーネント（Dialog / Sidebar / AlertDialog など） |
+| React Hook Form | フォーム状態管理 |
+| Zod | スキーマバリデーション |
+| sonner | トースト通知 |
+| lucide-react | アイコン |
+| Firebase SDK (web) | Firestore / Auth のクライアント SDK |
+| Vite | ビルドツール（TanStack Start 内蔵） |
+| Service Worker（PWA）| インストール可能な PWA 対応 |
 
 ### 7.2 バックエンド / インフラ
 
-| 技術 | バージョン | 用途 |
-|------|-----------|------|
-| Firebase Authentication | - | ユーザー認証（Google OAuth） |
-| Cloud Firestore | - | NoSQLデータベース |
-| Firebase Functions | v2 | サーバーレス関数（Amazon情報取得） |
-| Firebase Hosting | - | 静的ホスティング + CDN |
+| 技術 | 用途 |
+|------|------|
+| Firebase Authentication | ユーザー認証（Google OAuth） |
+| Cloud Firestore | NoSQL データベース（`onSnapshot` によるリアルタイム同期） |
+| Firebase Functions v2 | サーバーレス関数（Firestore トリガー、HTTPS API）|
+| puppeteer-core + @sparticuz/chromium | Cloud Functions 上での Amazon 詳細ページのスクレイピング |
+| express + express-promise-router | HTTPS API ルーティング |
+| Firebase Hosting | 静的ホスティング + CDN |
 
 ### 7.3 開発ツール
 
@@ -723,56 +901,82 @@ TanStack Queryを使用してFirestoreに直接アクセスする操作:
 | GitHub Actions | CI/CD |
 | Firebase Emulator Suite | ローカル開発環境 |
 
-### 7.4 TanStack Start プロジェクト構成
+### 7.4 モノレポ構成
+
+pnpm workspace によるモノレポ構成。
 
 ```
-bookgroups/
+bookpoolcontexts/
 ├── apps/
-│   ├── web/                        # フロントエンド（TanStack Start SPA）
-│   │   ├── app/
-│   │   │   ├── routes/
-│   │   │   │   ├── __root.tsx          # ルートレイアウト
-│   │   │   │   ├── index.tsx           # / (本の一覧)
-│   │   │   │   ├── login.tsx           # /login
-│   │   │   │   ├── new.tsx             # /new (本の登録)
-│   │   │   │   ├── book.$bookId.tsx    # /book/:bookId (詳細)
-│   │   │   │   ├── groups.tsx          # /groups (グループ一覧)
-│   │   │   │   ├── group.$groupId.tsx  # /group/:groupId (グループ詳細)
-│   │   │   │   └── settings.tsx        # /settings
-│   │   │   ├── components/
-│   │   │   │   ├── ui/                 # 汎用UIコンポーネント
-│   │   │   │   ├── book/               # 本関連コンポーネント
-│   │   │   │   ├── group/              # グループ関連コンポーネント
-│   │   │   │   └── layout/             # レイアウトコンポーネント
-│   │   │   ├── hooks/
-│   │   │   │   ├── useAuth.ts
-│   │   │   │   ├── useBooks.ts
-│   │   │   │   ├── useGroups.ts
-│   │   │   │   └── useTags.ts
-│   │   │   ├── lib/
-│   │   │   │   ├── firebase.ts         # Firebase初期化
-│   │   │   │   ├── firestore.ts        # Firestore操作
-│   │   │   │   └── functions.ts        # Firebase Functions呼び出し
-│   │   │   ├── types/
-│   │   │   │   └── book.ts
-│   │   │   ├── router.tsx
-│   │   │   ├── routeTree.gen.ts        # 自動生成
-│   │   │   └── client.tsx
-│   │   └── package.json
-│   └── functions/                   # Firebase Functions
-│       ├── src/
-│       │   ├── index.ts
-│       │   └── scrapeAmazon.ts
-│       └── package.json
+│   ├── web/                               # フロントエンド（TanStack Start SPA）
+│   │   └── src/
+│   │       ├── routes/
+│   │       │   ├── __root.tsx
+│   │       │   ├── login.tsx              # /login
+│   │       │   ├── _authed.tsx            # 認証ガード用レイアウト
+│   │       │   └── _authed/
+│   │       │       ├── index.tsx          # / (ホーム)
+│   │       │       ├── groups.tsx         # /groups
+│   │       │       ├── tags.tsx           # /tags
+│   │       │       ├── settings.tsx       # /settings
+│   │       │       └── about.tsx          # /about
+│   │       ├── features/
+│   │       │   ├── books/
+│   │       │   │   ├── components/        # BookList, BookCard, BookRegistrationModal, BookEditModal, DeleteBookAlertDialog
+│   │       │   │   ├── hooks/              # useBooks, useCreateBookMutation, useUpdateBookMutation, useDeleteBookMutation, useRefetchBookMutation
+│   │       │   │   ├── schemas/            # bookRegistrationSchema / bookEditSchema (Zod)
+│   │       │   │   └── utils/              # parseAmazonHtml
+│   │       │   ├── groups/                  # GroupList, GroupSelectDropdown, CreateGroupDialog, EditGroupDialog, DeleteGroupAlertDialog, useGroups
+│   │       │   └── tags/                    # TagList, TagSuggestionDropdown, EditTagDialog, DeleteTagAlertDialog, useTags
+│   │       ├── components/                  # 共通コンポーネント（SideNav, Header, Footer, ThemeToggle, ui/）
+│   │       ├── hooks/                       # useHideReadBooks, useThemeMode, useKeyboardShortcut, useDisclosure, usePWAInstall, useServiceWorker など
+│   │       ├── infrastructure/
+│   │       │   └── firestore/               # books.ts, groups.ts, tags.ts, users.ts（Operations 層）
+│   │       ├── providers/
+│   │       │   └── FirebaseAuthProvider.tsx
+│   │       ├── lib/
+│   │       │   └── firebase.ts              # Firebase 初期化
+│   │       └── utils/
+│   │           └── convertDate.ts           # Timestamp → Date 変換
+│   └── functions/                           # Firebase Functions v2
+│       └── src/
+│           ├── index.ts                     # エクスポート集約
+│           ├── router.ts                    # Express ルーター
+│           ├── triggers/
+│           │   ├── onCreateBook.ts
+│           │   ├── onUpdateBook.ts
+│           │   ├── onDeleteBook.ts
+│           │   ├── onDeleteGroup.ts
+│           │   └── onDeleteTag.ts
+│           ├── services/
+│           │   └── scrapeBook.ts
+│           ├── api/
+│           │   └── health/test.ts
+│           ├── infrastructure/
+│           │   └── firestore/               # books, groups, tags の Admin SDK Operations
+│           ├── lib/
+│           │   ├── amazon.ts                # Amazon スクレイピング
+│           │   └── firebase.ts
+│           ├── config/firebase.ts
+│           ├── middleware/auth.ts
+│           └── utils/triggerOnce.ts
 ├── packages/
-│   └── common/                      # 共通型定義
-│       └── types/
+│   └── common/                              # 共通型定義（@bookpoolcontexts/common）
+│       └── src/
+│           ├── entities/
+│           │   ├── Auth.ts
+│           │   ├── Book.ts
+│           │   ├── Group.ts
+│           │   ├── Tag.ts
+│           │   └── User.ts
+│           └── utils/                       # normalizeTagLabel など
 ├── firebase.json
 ├── firestore.rules
-├── package.json
 ├── pnpm-workspace.yaml
-└── tsconfig.json
+└── package.json
 ```
+
+パスエイリアスは `@/` を使用する（`#/` は禁止）。
 
 ---
 
@@ -780,31 +984,59 @@ bookgroups/
 
 ### 8.1 Firestoreセキュリティルール
 
+各コレクションに対してスキーマバリデーション関数を用意し、`size()` / 型 / 必須フィールド の過不足をチェックする。Book は `updatedBy == 'user'` のみ許可し、`tags` サブコレクションは `create` を禁止する（Cloud Functions が Admin SDK で作成するため）。
+
 ```javascript
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ユーザードキュメント
+    function requestData() { return request.resource.data; }
+    function isSignedIn() { return request.auth.uid != null; }
+    function isUser(userId) { return request.auth.uid == userId; }
+
+    function isValidBookSchema(d) {
+      return d.size() == 16
+        && 'amazonUrl' in d && d.amazonUrl is string
+        && 'author' in d && (d.author is string || d.author == null)
+        && 'coverImageUrl' in d && (d.coverImageUrl is string || d.coverImageUrl == null)
+        && 'createdAt' in d && d.createdAt is timestamp
+        && 'foundBy' in d && d.foundBy is string
+        && 'groups' in d && d.groups is list
+        && 'isRead' in d && d.isRead is bool
+        && 'location' in d && d.location is string
+        && 'note' in d && d.note is string
+        && 'pages' in d && (d.pages is number || d.pages == null)
+        && 'purchasedBy' in d && d.purchasedBy is list
+        && 'scrapingStatus' in d && d.scrapingStatus is string
+        && 'tags' in d && d.tags is list
+        && 'title' in d && (d.title is string || d.title == null)
+        && 'updatedAt' in d && d.updatedAt is timestamp
+        && 'updatedBy' in d && d.updatedBy == 'user';
+    }
+
+    // Group / Tag / User のスキーマバリデーションも size()・各フィールド型を検証
+
     match /users/{userId} {
-      allow read, write: if request.auth != null
-                         && request.auth.uid == userId;
+      allow read: if isSignedIn() && isUser(userId);
+      allow create, update: if isSignedIn() && isUser(userId) && isValidUserSchema(requestData());
 
-      // 本サブコレクション
       match /books/{bookId} {
-        allow read, write: if request.auth != null
-                           && request.auth.uid == userId;
+        allow read: if isSignedIn() && isUser(userId);
+        allow create, update: if isSignedIn() && isUser(userId) && isValidBookSchema(requestData());
+        allow delete: if isSignedIn() && isUser(userId);
       }
 
-      // グループサブコレクション
       match /groups/{groupId} {
-        allow read, write: if request.auth != null
-                           && request.auth.uid == userId;
+        allow read: if isSignedIn() && isUser(userId);
+        allow create, update: if isSignedIn() && isUser(userId) && isValidGroupSchema(requestData());
+        allow delete: if isSignedIn() && isUser(userId);
       }
 
-      // タグサブコレクション
       match /tags/{tagId} {
-        allow read, write: if request.auth != null
-                           && request.auth.uid == userId;
+        allow read: if isSignedIn() && isUser(userId);
+        allow update: if isSignedIn() && isUser(userId) && isValidTagSchema(requestData());
+        allow delete: if isSignedIn() && isUser(userId);
+        // create は Cloud Functions（Admin SDK）のみ許可
       }
     }
   }
@@ -814,26 +1046,49 @@ service cloud.firestore {
 ### 8.2 入力値検証
 
 **クライアントサイド（Zod）:**
+
+登録フォームと編集フォームでスキーマを分けている。登録フォームでは `amazonUrl` または `amazonHtml` のいずれかが入力されていることを `refine` で保証する。
+
 ```typescript
-import { z } from 'zod';
+import { z } from 'zod'
 
-export const bookSchema = z.object({
-  amazonUrl: z.string().url(),
-  tags: z.array(z.string().max(50)).max(10).optional(),
-  foundBy: z.string().max(500).optional(),
-  location: z.string().max(200).optional(),
-  purchasedBy: z.array(z.enum(['物理本', 'Kindle', 'オフィス'])).optional(),
-  groups: z.array(z.string()).optional(),
-  note: z.string().max(2000).optional(),
-});
+export const bookRegistrationSchema = z
+  .object({
+    amazonUrl: z.string().default(''),
+    amazonHtml: z.string().default(''),
+    tags: z.array(z.string().max(50)).max(10).default([]),
+    foundBy: z.string().max(500).default(''),
+    location: z.string().max(200).default(''),
+    purchasedBy: z.array(z.string()).default([]),
+    groups: z.array(z.string()).default([]),
+    note: z.string().max(2000).default(''),
+    isRead: z.boolean().default(false),
+  })
+  .refine(
+    (d) => d.amazonUrl.trim() !== '' || d.amazonHtml.trim() !== '',
+    { message: 'AmazonのURLまたはHTMLのいずれかを入力してください', path: ['amazonUrl'] },
+  )
+  .refine(
+    (d) => {
+      if (d.amazonUrl.trim() === '') return true
+      try { new URL(d.amazonUrl); return true } catch { return false }
+    },
+    { message: '有効なURLを入力してください', path: ['amazonUrl'] },
+  )
 
-export type BookInput = z.infer<typeof bookSchema>;
+export const bookEditSchema = z.object({
+  tags: z.array(z.string().max(50)).max(10).default([]),
+  foundBy: z.string().max(500).default(''),
+  location: z.string().max(200).default(''),
+  purchasedBy: z.array(z.string()).default([]),
+  groups: z.array(z.string()).default([]),
+  note: z.string().max(2000).default(''),
+  isRead: z.boolean().default(false),
+})
 
 export const groupSchema = z.object({
   label: z.string().min(1).max(100),
-});
-
-export type GroupInput = z.infer<typeof groupSchema>;
+})
 ```
 
 ---
@@ -902,6 +1157,7 @@ VITE_FIREBASE_APP_ID=xxx
 |------|-----------|---------|--------|
 | 2026-04-07 | 1.0 | 初版作成 | - |
 | 2026-04-08 | 1.1 | 本の登録フローをAmazon検索方式からURL直接入力方式に変更。title/author/coverImageUrl/pagesはクライアントからnullで登録し、onCreateBookトリガーで自動取得する方式に変更。Amazon検索API廃止 | - |
+| 2026-04-11 | 1.2 | 実装に合わせて全面更新。Book に `scrapingStatus` / `updatedBy` 追加、HTML 直接入力フォールバック、再フェッチ機能、`onUpdateBook` / `onDeleteBook` / `onDeleteGroup` / `onDeleteTag` トリガー、タグ管理画面、設定画面（テーマ／読了非表示）、PWA 対応、キーボードショートカット、モノレポ構成・フィールド命名（`bookId` / `tagId` / `groupId`）、Firestore スキーマバリデーションルールを追記 | - |
 
 ---
 
