@@ -1,7 +1,9 @@
-import { MonitorIcon, MoonIcon, SunIcon } from 'lucide-react'
 import { createFileRoute } from '@tanstack/react-router'
+import { MonitorIcon, MoonIcon, SunIcon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { useHideReadBooks } from '@/hooks/useHideReadBooks'
 import { type ThemeMode, useThemeMode } from '@/hooks/useThemeMode'
 import { useFirebaseAuthContext } from '@/providers/FirebaseAuthProvider'
 
@@ -22,6 +24,7 @@ const themeOptions: Array<{
 const SettingsPage = () => {
   const { logout } = useFirebaseAuthContext()
   const { mode, setThemeMode } = useThemeMode()
+  const { hideReadBooks, setHideReadBooks } = useHideReadBooks()
 
   return (
     <main className="pb-8 pt-14">
@@ -42,6 +45,17 @@ const SettingsPage = () => {
             </Button>
           ))}
         </div>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-4 text-lg font-semibold">本の表示</h2>
+        <label className="flex items-center gap-2 text-sm">
+          <Checkbox
+            checked={hideReadBooks}
+            onCheckedChange={(v) => setHideReadBooks(v === true)}
+          />
+          読了済みの本を一覧に表示しない
+        </label>
       </section>
 
       <section>
