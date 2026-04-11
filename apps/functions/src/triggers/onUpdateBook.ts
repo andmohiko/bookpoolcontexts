@@ -10,6 +10,7 @@ import {
   updateTagOperation,
 } from '~/infrastructure/firestore/tags'
 import { serverTimestamp } from '~/lib/firebase'
+import { scrapeAndUpdateBook } from '~/services/scrapeBook'
 import { triggerOnce } from '~/utils/triggerOnce'
 
 /** タグ配列を正規化 + 重複除去する */
@@ -21,6 +22,7 @@ const normalizeTagList = (tags: string[]): string[] =>
 export const onUpdateBook = onDocumentUpdated(
   {
     document: 'users/{uid}/books/{bookId}',
+    memory: '2GiB',
     region: 'asia-northeast1',
   },
   triggerOnce('onUpdateBook', async (event) => {
@@ -34,6 +36,20 @@ export const onUpdateBook = onDocumentUpdated(
     if (after.updatedBy === 'trigger') {
       console.log('トリガーによる更新のためスキップ:', bookId)
       return
+    }
+
+    // ===== 再フェッチ検知 =====
+    // scrapingStatus が 'scraping' に変わった場合、Amazonから再スクレイピングを実行
+    if (
+      before.scrapingStatus !== 'scraping' &&
+      after.scrapingStatus === 'scraping'
+    ) {
+      console.log('再フェッチを検知しました:', bookId)
+      await scrapeAndUpdateBook(
+        uid,
+        bookId,
+        after.amazonUrl as string | undefined,
+      )
     }
 
     // ===== グループ count 差分同期 =====
