@@ -33,7 +33,6 @@ export const SideNav = () => {
     <Sidebar collapsible="icon">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>タグ</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="gap-2">
               <SidebarMenuItem>
@@ -41,42 +40,11 @@ export const SideNav = () => {
                   asChild
                   isActive={selectedTag === null && selectedGroup === null}
                   tooltip="すべて"
-                  className="data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90"
+                  className="data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90 data-[active=true]:hover:text-primary-foreground"
                 >
                   <Link to="/" search={{}}>
                     <TagIcon />
                     <span>すべて</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              {isLoadingTags
-                ? Array.from({ length: 4 }).map((_, i) => (
-                    <SidebarMenuItem key={i}>
-                      <SidebarMenuSkeleton />
-                    </SidebarMenuItem>
-                  ))
-                : tags.map((tag) => (
-                    <SidebarMenuItem key={tag.tagId}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={selectedTag === tag.label}
-                        tooltip={tag.label}
-                        className="data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90"
-                      >
-                        <Link to="/" search={{ tag: tag.label }}>
-                          <TagIcon />
-                          <span>{tag.label}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                      <SidebarMenuBadge>{tag.count}</SidebarMenuBadge>
-                    </SidebarMenuItem>
-                  ))}
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="タグ管理">
-                  <Link to="/tags">
-                    <Settings2 />
-                    <span>タグ管理</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -100,7 +68,7 @@ export const SideNav = () => {
                         asChild
                         isActive={selectedGroup === group.label}
                         tooltip={group.label}
-                        className="data-[active=true]:font-bold data-[active=true]:text-foreground"
+                        className="data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90 data-[active=true]:hover:text-primary-foreground"
                       >
                         <Link to="/" search={{ group: group.label }}>
                           <FolderOpen />
@@ -109,7 +77,9 @@ export const SideNav = () => {
                       </SidebarMenuButton>
                       <SidebarMenuBadge
                         className={
-                          selectedGroup === group.label ? 'text-foreground' : ''
+                          selectedGroup === group.label
+                            ? '!text-primary-foreground'
+                            : ''
                         }
                       >
                         {group.count}
@@ -121,6 +91,52 @@ export const SideNav = () => {
                   <Link to="/groups">
                     <Settings2 />
                     <span>グループ管理</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>タグ</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu className="gap-2">
+              {isLoadingTags
+                ? Array.from({ length: 4 }).map((_, i) => (
+                    <SidebarMenuItem key={i}>
+                      <SidebarMenuSkeleton />
+                    </SidebarMenuItem>
+                  ))
+                : tags.map((tag) => (
+                    <SidebarMenuItem key={tag.tagId}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={selectedTag === tag.label}
+                        tooltip={tag.label}
+                        className="data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90 data-[active=true]:hover:text-primary-foreground"
+                      >
+                        <Link to="/" search={{ tag: tag.label }}>
+                          <TagIcon />
+                          <span>{tag.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                      <SidebarMenuBadge
+                        className={
+                          selectedTag === tag.label
+                            ? '!text-primary-foreground'
+                            : ''
+                        }
+                      >
+                        {tag.count}
+                      </SidebarMenuBadge>
+                    </SidebarMenuItem>
+                  ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="タグ管理">
+                  <Link to="/tags">
+                    <Settings2 />
+                    <span>タグ管理</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
