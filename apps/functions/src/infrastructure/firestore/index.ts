@@ -1,14 +1,16 @@
 export {
-  createNoteOperation,
-  deleteNoteOperation,
-  fetchNoteOperation,
-  fetchNotesOperation,
-  updateNoteOperation,
-} from './notes'
+  removeGroupFromAllBooksOperation,
+  removeTagFromAllBooksOperation,
+  updateBookOperation,
+} from './books'
+export {
+  updateGroupByLabelOperation,
+  updateGroupOperation,
+} from './groups'
 export {
   createTagOperation,
   deleteTagOperation,
-  fetchTagOperation,
+  fetchTagByLabelOperation,
   updateTagOperation,
 } from './tags'
 export {
@@ -17,4 +19,3 @@ export {
   fetchUserOperation,
   updateUserOperation,
 } from './users'
-export { updateGroupOperation } from './groups'

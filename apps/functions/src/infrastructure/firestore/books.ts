@@ -42,3 +42,29 @@ export const removeGroupFromAllBooksOperation = async (
   }
   await batch.commit()
 }
+
+/** 特定タグが付いた全ての本からタグラベルを除去する */
+export const removeTagFromAllBooksOperation = async (
+  uid: string,
+  tagLabel: string,
+): Promise<void> => {
+  const booksRef = db
+    .collection(userCollection)
+    .doc(uid)
+    .collection(bookCollection)
+  const snapshot = await booksRef
+    .where('tags', 'array-contains', tagLabel)
+    .get()
+
+  if (snapshot.empty) return
+
+  const batch = db.batch()
+  for (const doc of snapshot.docs) {
+    batch.update(doc.ref, {
+      tags: FieldValue.arrayRemove(tagLabel),
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: 'trigger' as const,
+    })
+  }
+  await batch.commit()
+}

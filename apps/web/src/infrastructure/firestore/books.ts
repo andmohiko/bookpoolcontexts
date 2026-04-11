@@ -156,6 +156,53 @@ export const subscribeBooksByGroupOperation = (
   })
 }
 
+/** タグが付いた本の一覧を取得する（ページネーション対応） */
+export const fetchBooksByTagOperation = async (
+  uid: Uid,
+  tagLabel: string,
+  pageSize: number,
+  lastDocument: DocumentSnapshot | null,
+): Promise<FetchResultWithPagination<Book>> => {
+  const baseConstraints = [
+    where('tags', 'array-contains', tagLabel),
+    orderBy('createdAt', 'desc'),
+  ]
+  const constraints = lastDocument
+    ? [...baseConstraints, startAfter(lastDocument), limit(pageSize)]
+    : [...baseConstraints, limit(pageSize)]
+
+  const snapshot = await getDocs(query(booksRef(uid), ...constraints))
+  const items = snapshot.docs.map(
+    (d) => ({ bookId: d.id, ...convertDate(d.data(), dateColumns) }) as Book,
+  )
+  const lastDoc =
+    snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null
+  const hasMore = snapshot.docs.length === pageSize
+
+  return { items, lastDoc, hasMore }
+}
+
+/** タグが付いた本の一覧をリアルタイム購読する */
+export const subscribeBooksByTagOperation = (
+  uid: Uid,
+  tagLabel: string,
+  pageSize: number,
+  setter: (books: Array<Book>) => void,
+): Unsubscribe => {
+  const q = query(
+    booksRef(uid),
+    where('tags', 'array-contains', tagLabel),
+    orderBy('createdAt', 'desc'),
+    limit(pageSize),
+  )
+  return onSnapshot(q, (snapshot) => {
+    const books = snapshot.docs.map(
+      (d) => ({ bookId: d.id, ...convertDate(d.data(), dateColumns) }) as Book,
+    )
+    setter(books)
+  })
+}
+
 /** 本を作成する */
 export const createBookOperation = async (
   uid: Uid,

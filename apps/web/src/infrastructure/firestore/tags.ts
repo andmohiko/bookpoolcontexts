@@ -1,8 +1,10 @@
-import type { Tag, Uid } from '@bookpoolcontexts/common'
+import type { Tag, TagId, Uid } from '@bookpoolcontexts/common'
 import { tagCollection, userCollection } from '@bookpoolcontexts/common'
 import type { Unsubscribe } from 'firebase/firestore'
 import {
   collection,
+  deleteDoc,
+  doc,
   limit,
   onSnapshot,
   orderBy,
@@ -15,6 +17,9 @@ import { convertDate } from '@/utils/convertDate'
 const dateColumns = ['createdAt', 'updatedAt'] as const satisfies Array<string>
 
 const tagsRef = (uid: Uid) => collection(db, userCollection, uid, tagCollection)
+
+const tagDocRef = (uid: Uid, tagId: TagId) =>
+  doc(db, userCollection, uid, tagCollection, tagId)
 
 /** タグ一覧をリアルタイム購読する（label 昇順） */
 export const subscribeTagsOperation = (
@@ -53,4 +58,12 @@ export const subscribeRecentTagsOperation = (
     },
     onError,
   )
+}
+
+/** タグを削除する */
+export const deleteTagOperation = async (
+  uid: Uid,
+  tagId: TagId,
+): Promise<void> => {
+  await deleteDoc(tagDocRef(uid, tagId))
 }
