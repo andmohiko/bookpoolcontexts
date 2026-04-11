@@ -72,6 +72,14 @@ export const SideNav = () => {
                       <SidebarMenuBadge>{tag.count}</SidebarMenuBadge>
                     </SidebarMenuItem>
                   ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="タグ管理">
+                  <Link to="/tags">
+                    <Settings2 />
+                    <span>タグ管理</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

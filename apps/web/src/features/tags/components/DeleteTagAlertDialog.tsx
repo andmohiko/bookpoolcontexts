@@ -1,4 +1,4 @@
-import type { Group } from '@bookpoolcontexts/common'
+import type { Tag } from '@bookpoolcontexts/common'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -8,23 +8,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { useDeleteGroupMutation } from '@/features/groups/hooks/useDeleteGroupMutation'
+import { useDeleteTagMutation } from '@/features/tags/hooks/useDeleteTagMutation'
 
-type DeleteGroupAlertDialogProps = {
+type DeleteTagAlertDialogProps = {
   isOpen: boolean
   onClose: () => void
-  group: Group
+  tag: Tag
 }
 
-export const DeleteGroupAlertDialog = ({
+export const DeleteTagAlertDialog = ({
   isOpen,
   onClose,
-  group,
-}: DeleteGroupAlertDialogProps) => {
-  const { deleteGroup, isDeleting } = useDeleteGroupMutation()
+  tag,
+}: DeleteTagAlertDialogProps) => {
+  const { deleteTag, isDeleting } = useDeleteTagMutation()
 
   const handleDelete = async (): Promise<void> => {
-    await deleteGroup(group.groupId)
+    await deleteTag(tag.tagId)
     onClose()
   }
 
@@ -32,13 +32,13 @@ export const DeleteGroupAlertDialog = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>グループを削除</DialogTitle>
+          <DialogTitle>タグを削除</DialogTitle>
           <DialogDescription>
-            「{group.label}」を削除しますか？
-            {group.count > 0 && (
+            「{tag.label}」を削除しますか？
+            {tag.count > 0 && (
               <>
-                このグループには{group.count}
-                冊の本が登録されています。本自体は削除されませんが、グループの紐付けが解除されます。
+                このタグは{tag.count}
+                冊の本に付いています。本自体は削除されませんが、タグの紐付けが解除されます。
               </>
             )}
           </DialogDescription>

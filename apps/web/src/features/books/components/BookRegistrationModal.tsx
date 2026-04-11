@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { X } from 'lucide-react'
+import { normalizeTagLabel } from '@bookpoolcontexts/common'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -86,9 +87,9 @@ export const BookRegistrationModal = ({
   }
 
   const addTag = (label: string): void => {
-    const trimmed = label.trim()
-    if (trimmed && !tags.includes(trimmed)) {
-      setValue('tags', [...tags, trimmed])
+    const normalized = normalizeTagLabel(label)
+    if (normalized && !tags.includes(normalized)) {
+      setValue('tags', [...tags, normalized])
     }
     setTagInput('')
   }

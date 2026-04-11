@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { X } from 'lucide-react'
 import type { Book } from '@bookpoolcontexts/common'
+import { normalizeTagLabel } from '@bookpoolcontexts/common'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -86,9 +87,9 @@ export const BookEditModal = ({
   }
 
   const addTag = (label: string): void => {
-    const trimmed = label.trim()
-    if (trimmed && !tags.includes(trimmed)) {
-      setValue('tags', [...tags, trimmed])
+    const normalized = normalizeTagLabel(label)
+    if (normalized && !tags.includes(normalized)) {
+      setValue('tags', [...tags, normalized])
     }
     setTagInput('')
   }
@@ -229,8 +230,8 @@ export const BookEditModal = ({
           <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
             <Button
               type="button"
-              variant="ghost"
-              className="text-destructive hover:text-destructive"
+              variant="destructive"
+              className="bg-destructive text-white hover:bg-destructive/90 dark:bg-destructive dark:hover:bg-destructive/90"
               onClick={() => setIsDeleteDialogOpen(true)}
             >
               削除

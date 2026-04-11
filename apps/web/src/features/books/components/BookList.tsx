@@ -9,8 +9,8 @@ type BookListProps = {
   onClickBook: (book: Book) => void
 }
 
-export const BookList = ({ group, onClickBook }: BookListProps) => {
-  const { books, isLoading } = useBooks({ group })
+export const BookList = ({ tag, group, onClickBook }: BookListProps) => {
+  const { books, isLoading } = useBooks({ tag, group })
 
   if (isLoading) {
     return (

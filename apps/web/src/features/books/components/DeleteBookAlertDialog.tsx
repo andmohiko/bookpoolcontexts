@@ -48,6 +48,7 @@ export const DeleteBookAlertDialog = ({
             variant="destructive"
             onClick={handleDelete}
             disabled={isDeleting}
+            className="bg-destructive text-white hover:bg-destructive/90 dark:bg-destructive dark:hover:bg-destructive/90"
           >
             {isDeleting ? '削除中...' : '削除'}
           </Button>
