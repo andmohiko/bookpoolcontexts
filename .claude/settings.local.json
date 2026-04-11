@@ -16,7 +16,8 @@
       "Bash(pnpm web build)",
       "Bash(pnpm functions pre-build)",
       "Bash(firebase functions:log --only onCreateBook)",
-      "Bash(xargs ls:*)"
+      "Bash(xargs ls:*)",
+      "Bash(pnpm lint:tsc)"
     ],
     "deny": [],
     "ask": []
