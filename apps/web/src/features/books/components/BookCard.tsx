@@ -1,5 +1,5 @@
 import type { Book } from '@bookpoolcontexts/common'
-import { RefreshCw } from 'lucide-react'
+import { CheckCircle2, RefreshCw } from 'lucide-react'
 import type { KeyboardEvent, MouseEvent } from 'react'
 
 import { Badge } from '@/components/ui/badge'
@@ -88,9 +88,13 @@ export const BookCard = ({ book, onClick }: BookCardProps) => {
           : null}
       </div>
       {book.isRead && (
-        <span className="absolute top-1 right-1 rounded bg-background/80 px-1 text-[10px] text-muted-foreground">
-          読了
-        </span>
+        <Badge
+          variant="default"
+          className="absolute top-1 right-1 pointer-events-none size-8 rounded-full p-0 border-0 bg-emerald-500 text-white shadow-md [&>svg]:!size-5"
+          aria-label="読了"
+        >
+          <CheckCircle2 />
+        </Badge>
       )}
     </div>
   )

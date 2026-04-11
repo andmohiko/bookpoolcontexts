@@ -10,6 +10,7 @@ export const bookRegistrationSchema = z
     purchasedBy: z.array(z.string()).default([]),
     groups: z.array(z.string()).default([]),
     note: z.string().max(2000).default(''),
+    isRead: z.boolean().default(false),
   })
   .refine(
     (data) => data.amazonUrl.trim() !== '' || data.amazonHtml.trim() !== '',
@@ -40,6 +41,7 @@ export const bookEditSchema = z.object({
   purchasedBy: z.array(z.string()).default([]),
   groups: z.array(z.string()).default([]),
   note: z.string().max(2000).default(''),
+  isRead: z.boolean().default(false),
 })
 
 export type BookEditFormValues = z.infer<typeof bookEditSchema>

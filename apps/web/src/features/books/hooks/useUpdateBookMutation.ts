@@ -13,6 +13,7 @@ export type UpdateBookInput = {
   purchasedBy: string[]
   groups: string[]
   note: string
+  isRead: boolean
 }
 
 export type UseUpdateBookMutationReturn = {

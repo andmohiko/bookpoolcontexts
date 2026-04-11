@@ -58,12 +58,14 @@ export const BookRegistrationModal = ({
       purchasedBy: [],
       groups: [],
       note: '',
+      isRead: false,
     },
   })
 
   const tags = watch('tags')
   const purchasedBy = watch('purchasedBy')
   const groups = watch('groups')
+  const isRead = watch('isRead')
 
   useEffect(() => {
     if (isOpen) {
@@ -76,6 +78,7 @@ export const BookRegistrationModal = ({
         purchasedBy: [],
         groups: [],
         note: '',
+        isRead: false,
       })
       setTagInput('')
     }
@@ -242,6 +245,17 @@ export const BookRegistrationModal = ({
               rows={3}
               {...register('note')}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>読了状態</Label>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={isRead}
+                onCheckedChange={(v) => setValue('isRead', v === true)}
+              />
+              読み終わった
+            </label>
           </div>
 
           <DialogFooter>

@@ -16,6 +16,7 @@ export type CreateBookInput = {
   purchasedBy: string[]
   groups: string[]
   note: string
+  isRead: boolean
 }
 
 export type UseCreateBookMutationReturn = {
@@ -59,7 +60,6 @@ export const useCreateBookMutation = (): UseCreateBookMutationReturn => {
         author,
         coverImageUrl,
         pages,
-        isRead: false,
         scrapingStatus,
         createdAt: serverTimestamp,
         updatedAt: serverTimestamp,
