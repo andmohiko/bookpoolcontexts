@@ -21,7 +21,10 @@ import { usePWAInstall } from '@/hooks/usePWAInstall'
 export const SideNav = () => {
   const { tags, isLoading: isLoadingTags } = useTags()
   const { groups, isLoading: isLoadingGroups } = useGroups()
-  const search = useSearch({ strict: false }) as { tag?: string; group?: string }
+  const search = useSearch({ strict: false }) as {
+    tag?: string
+    group?: string
+  }
   const selectedTag = search.tag ?? null
   const selectedGroup = search.group ?? null
   const { canInstall, promptInstall } = usePWAInstall()
@@ -74,7 +77,7 @@ export const SideNav = () => {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>グループ</SidebarGroupLabel>
+          <SidebarGroupLabel>文脈グループ</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="gap-2">
               {isLoadingGroups
@@ -97,7 +100,9 @@ export const SideNav = () => {
                         </Link>
                       </SidebarMenuButton>
                       <SidebarMenuBadge
-                        className={selectedGroup === group.label ? 'text-foreground' : ''}
+                        className={
+                          selectedGroup === group.label ? 'text-foreground' : ''
+                        }
                       >
                         {group.count}
                       </SidebarMenuBadge>

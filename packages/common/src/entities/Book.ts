@@ -11,7 +11,7 @@ export type BookId = string
 export type UpdatedBy = 'trigger' | 'user'
 
 /** スクレイピングの状態 */
-export type ScrapingStatus = 'scraping' | 'completed' | 'failed'
+export type ScrapingStatus = 'scraping' | 'completed' | 'failed' | 'skipped'
 
 /** Entity型（Firestoreから取得したデータ、Date変換済み） */
 export type Book = {

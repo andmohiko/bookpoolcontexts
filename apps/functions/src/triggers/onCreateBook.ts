@@ -1,4 +1,7 @@
-import type { UpdateBookDtoFromAdmin } from '@bookpoolcontexts/common'
+import type {
+  ScrapingStatus,
+  UpdateBookDtoFromAdmin,
+} from '@bookpoolcontexts/common'
 import { FieldValue } from 'firebase-admin/firestore'
 import { onDocumentCreated } from 'firebase-functions/v2/firestore'
 import '~/config/firebase'
@@ -20,9 +23,16 @@ export const onCreateBook = onDocumentCreated(
     const { uid, bookId } = event.params
     const data = event.data.data()
     const amazonUrl = data.amazonUrl as string
+    const scrapingStatus = data.scrapingStatus as ScrapingStatus | undefined
 
     // スクレイピング処理
-    if (!amazonUrl) {
+    if (scrapingStatus === 'skipped') {
+      // HTMLから情報取得済みならスクレイピングをスキップ
+      console.log(
+        'scrapingStatus=skippedのためスクレイピングをスキップ:',
+        bookId,
+      )
+    } else if (!amazonUrl) {
       console.log('amazonUrl が存在しないためスキップ:', bookId)
       await updateBookOperation(uid, bookId, {
         scrapingStatus: 'failed',

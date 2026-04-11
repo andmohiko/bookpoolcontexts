@@ -7,7 +7,7 @@
     "lint:biome": "biome lint ./src",
     "lint:cspell": "cspell -c ../../cspell.json src/**/*",
     "pre-build": "tsup",
-    "deploy": "firebase deploy --only functions",
+    "deploy:functions": "firebase deploy --only functions",
     "logs": "firebase functions:log"
   },
   "main": "lib/index.js",

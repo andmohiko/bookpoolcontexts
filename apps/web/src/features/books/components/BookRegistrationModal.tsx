@@ -50,6 +50,7 @@ export const BookRegistrationModal = ({
     resolver: zodResolver(bookRegistrationSchema),
     defaultValues: {
       amazonUrl: '',
+      amazonHtml: '',
       tags: [],
       foundBy: '',
       location: '',
@@ -67,6 +68,7 @@ export const BookRegistrationModal = ({
     if (isOpen) {
       reset({
         amazonUrl: '',
+        amazonHtml: '',
         tags: [],
         foundBy: '',
         location: '',
@@ -119,7 +121,7 @@ export const BookRegistrationModal = ({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="max-h-[85vh] overflow-y-auto sm:max-w-md"
+        className="max-h-[85vh] overflow-y-auto sm:max-w-lg md:max-w-2xl lg:max-w-3xl"
         onOpenAutoFocus={(e) => {
           e.preventDefault()
           setTimeout(() => {
@@ -131,9 +133,9 @@ export const BookRegistrationModal = ({
           <DialogTitle>本を登録</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="min-w-0 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="amazonUrl">AmazonのURL *</Label>
+            <Label htmlFor="amazonUrl">AmazonのURL</Label>
             <Input
               id="amazonUrl"
               placeholder="https://www.amazon.co.jp/dp/..."
@@ -142,6 +144,20 @@ export const BookRegistrationModal = ({
             {errors.amazonUrl && (
               <p className="text-xs text-destructive">{errors.amazonUrl.message}</p>
             )}
+            <p className="text-xs text-muted-foreground">
+              URL または下のHTMLのいずれかを入力してください
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="amazonHtml">Amazon詳細ページのHTML（任意）</Label>
+            <Textarea
+              id="amazonHtml"
+              placeholder="スクレイピングが失敗する場合、Amazon詳細ページを開いて右クリック→ページのソース表示からHTMLをコピーして貼り付け"
+              rows={10}
+              className="[field-sizing:fixed] w-full max-w-full max-h-60 resize-none overflow-auto whitespace-pre"
+              {...register('amazonHtml')}
+            />
           </div>
 
           <div className="space-y-2">
