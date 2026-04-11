@@ -10,6 +10,7 @@ export { onCreateBook } from './triggers/onCreateBook'
 export { onUpdateBook } from './triggers/onUpdateBook'
 export { onDeleteBook } from './triggers/onDeleteBook'
 export { onDeleteGroup } from './triggers/onDeleteGroup'
+export { onDeleteTag } from './triggers/onDeleteTag'
 
 // API
 export const api = onRequest(

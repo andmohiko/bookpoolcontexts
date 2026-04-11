@@ -2,11 +2,17 @@ import type {
   ScrapingStatus,
   UpdateBookDtoFromAdmin,
 } from '@bookpoolcontexts/common'
+import { normalizeTagLabel } from '@bookpoolcontexts/common'
 import { FieldValue } from 'firebase-admin/firestore'
 import { onDocumentCreated } from 'firebase-functions/v2/firestore'
 import '~/config/firebase'
 import { updateBookOperation } from '~/infrastructure/firestore/books'
 import { updateGroupByLabelOperation } from '~/infrastructure/firestore/groups'
+import {
+  createTagOperation,
+  fetchTagByLabelOperation,
+  updateTagOperation,
+} from '~/infrastructure/firestore/tags'
 import { fetchAmazonBookDetail } from '~/lib/amazon'
 import { serverTimestamp } from '~/lib/firebase'
 import { triggerOnce } from '~/utils/triggerOnce'
@@ -104,6 +110,39 @@ export const onCreateBook = onDocumentCreated(
         }
       }
       console.log('グループカウントを更新しました:', bookId, groups)
+    }
+
+    // タグ count 同期
+    // 重複除去 + 正規化（クライアントでもガード済みだが二重の保険）
+    const rawTags: string[] = data.tags ?? []
+    const tags = Array.from(
+      new Set(
+        rawTags.map((t) => normalizeTagLabel(t)).filter((t) => t !== ''),
+      ),
+    )
+    if (tags.length > 0) {
+      for (const label of tags) {
+        try {
+          const existing = await fetchTagByLabelOperation(uid, label)
+          if (existing) {
+            await updateTagOperation(uid, existing.tagId, {
+              count: FieldValue.increment(1),
+              updatedAt: serverTimestamp,
+            })
+          } else {
+            // 未知のタグは count=1 で新規作成
+            await createTagOperation(uid, {
+              label,
+              count: 1,
+              createdAt: serverTimestamp,
+              updatedAt: serverTimestamp,
+            })
+          }
+        } catch (error) {
+          console.error('タグカウント更新に失敗:', label, error)
+        }
+      }
+      console.log('タグカウントを更新しました:', bookId, tags)
     }
   }),
 )
