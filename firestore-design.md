@@ -30,6 +30,7 @@
 
 ### 詳細
 
+- amazonUrl: String Amazon商品ページのURL
 - author: String 本の著者
 - coverImageUrl: String 表紙の画像URL
 - createdAt: Timestamp 作成日時
