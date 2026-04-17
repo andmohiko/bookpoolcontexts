@@ -125,7 +125,7 @@ export const BookRegistrationModal = ({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="max-h-[85vh] overflow-y-auto sm:max-w-lg md:max-w-2xl lg:max-w-3xl"
+        className="flex max-h-[85vh] flex-col overflow-hidden sm:max-w-lg md:max-w-2xl lg:max-w-3xl"
         onOpenAutoFocus={(e) => {
           e.preventDefault()
           setTimeout(() => {
@@ -137,128 +137,130 @@ export const BookRegistrationModal = ({
           <DialogTitle>本を登録</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="min-w-0 space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="amazonUrl">AmazonのURL</Label>
-            <Input
-              id="amazonUrl"
-              placeholder="https://www.amazon.co.jp/dp/..."
-              {...register('amazonUrl')}
-            />
-            {errors.amazonUrl && (
-              <p className="text-xs text-destructive">{errors.amazonUrl.message}</p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              URL または下のHTMLのいずれかを入力してください
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="amazonHtml">Amazon詳細ページのHTML（任意）</Label>
-            <Textarea
-              id="amazonHtml"
-              placeholder="スクレイピングが失敗する場合、Amazon詳細ページを開いて右クリック→ページのソース表示からHTMLをコピーして貼り付け"
-              rows={10}
-              className="[field-sizing:fixed] w-full max-w-full max-h-60 resize-none overflow-auto whitespace-pre"
-              {...register('amazonHtml')}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>タグ</Label>
-            <div className="flex flex-wrap gap-1.5">
-              {tags.map((tag) => (
-                <Badge key={tag} variant="secondary" className="gap-1">
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => removeTag(tag)}
-                    className="ml-0.5 rounded-full hover:bg-muted"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-            <Input
-              placeholder="タグを入力してEnterで追加"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={handleTagKeyDown}
-            />
-            <TagSuggestionDropdown
-              tagInput={tagInput}
-              activeTags={tags}
-              onSelect={addTag}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="foundBy">どこで見つけたか</Label>
-            <Input
-              id="foundBy"
-              placeholder="SNS、友人の推薦、書店で見かけたなど"
-              {...register('foundBy')}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="location">どこで読めるか</Label>
-            <Input
-              id="location"
-              placeholder="図書館、ブックオフ、Kindle Unlimitedなど"
-              {...register('location')}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>購入場所</Label>
-            <div className="flex gap-4">
-              {PURCHASED_BY_OPTIONS.map((option) => (
-                <label
-                  key={option}
-                  className="flex items-center gap-2 text-sm"
-                >
-                  <Checkbox
-                    checked={purchasedBy.includes(option)}
-                    onCheckedChange={() => togglePurchasedBy(option)}
-                  />
-                  {option}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>グループ</Label>
-            <GroupSelectDropdown
-              selectedGroups={groups}
-              onChange={(labels) => setValue('groups', labels)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="note">メモ</Label>
-            <Textarea
-              id="note"
-              placeholder="なぜこの本を読みたいか、期待することなど"
-              rows={3}
-              {...register('note')}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>読了状態</Label>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={isRead}
-                onCheckedChange={(v) => setValue('isRead', v === true)}
+        <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="amazonUrl">AmazonのURL</Label>
+              <Input
+                id="amazonUrl"
+                placeholder="https://www.amazon.co.jp/dp/..."
+                {...register('amazonUrl')}
               />
-              読み終わった
-            </label>
+              {errors.amazonUrl && (
+                <p className="text-xs text-destructive">{errors.amazonUrl.message}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                URL または下のHTMLのいずれかを入力してください
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="amazonHtml">Amazon詳細ページのHTML（任意）</Label>
+              <Textarea
+                id="amazonHtml"
+                placeholder="スクレイピングが失敗する場合、Amazon詳細ページを開いて右クリック→ページのソース表示からHTMLをコピーして貼り付け"
+                rows={10}
+                className="[field-sizing:fixed] w-full max-w-full max-h-60 resize-none overflow-auto whitespace-pre"
+                {...register('amazonHtml')}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>タグ</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {tags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="gap-1">
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => removeTag(tag)}
+                      className="ml-0.5 rounded-full hover:bg-muted"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+              <Input
+                placeholder="タグを入力してEnterで追加"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={handleTagKeyDown}
+              />
+              <TagSuggestionDropdown
+                tagInput={tagInput}
+                activeTags={tags}
+                onSelect={addTag}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="foundBy">どこで見つけたか</Label>
+              <Input
+                id="foundBy"
+                placeholder="SNS、友人の推薦、書店で見かけたなど"
+                {...register('foundBy')}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="location">どこで読めるか</Label>
+              <Input
+                id="location"
+                placeholder="図書館、ブックオフ、Kindle Unlimitedなど"
+                {...register('location')}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>購入場所</Label>
+              <div className="flex gap-4">
+                {PURCHASED_BY_OPTIONS.map((option) => (
+                  <label
+                    key={option}
+                    className="flex items-center gap-2 text-sm"
+                  >
+                    <Checkbox
+                      checked={purchasedBy.includes(option)}
+                      onCheckedChange={() => togglePurchasedBy(option)}
+                    />
+                    {option}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>グループ</Label>
+              <GroupSelectDropdown
+                selectedGroups={groups}
+                onChange={(labels) => setValue('groups', labels)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="note">メモ</Label>
+              <Textarea
+                id="note"
+                placeholder="なぜこの本を読みたいか、期待することなど"
+                rows={3}
+                {...register('note')}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>読了状態</Label>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={isRead}
+                  onCheckedChange={(v) => setValue('isRead', v === true)}
+                />
+                読み終わった
+              </label>
+            </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="pt-4">
             <Button type="button" variant="outline" onClick={onClose}>
               キャンセル
             </Button>
