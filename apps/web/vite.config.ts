@@ -25,9 +25,9 @@ const config = defineConfig({
       injectRegister: null,
       includeAssets: ['favicon.ico', 'logo192.png', 'logo512.png'],
       manifest: {
-        name: 'Vector Memo',
-        short_name: 'Vector Memo',
-        description: 'セマンティック検索メモ帳アプリケーション',
+        name: 'BookPoolContexts',
+        short_name: 'BookPoolContexts',
+        description: '読みたい本の管理アプリケーション',
         theme_color: '#000000',
         background_color: '#ffffff',
         display: 'standalone',

@@ -37,11 +37,11 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'Vector Memo',
+        title: 'BookPoolContexts',
       },
       {
         name: 'description',
-        content: 'セマンティック検索メモ帳アプリケーション',
+        content: '読みたい本の管理アプリケーション',
       },
       {
         name: 'theme-color',
@@ -57,7 +57,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       },
       {
         name: 'apple-mobile-web-app-title',
-        content: 'Vector Memo',
+        content: 'BookPoolContexts',
       },
     ],
     links: [
