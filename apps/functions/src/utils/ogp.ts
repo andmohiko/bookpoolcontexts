@@ -42,7 +42,7 @@ export const fetchOgp = async (url: string): Promise<OgpInfo> => {
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; VectorNoteBot/1.0)',
+        'User-Agent': 'Mozilla/5.0 (compatible; BookPoolContextsBot/1.0)',
       },
     })
 
