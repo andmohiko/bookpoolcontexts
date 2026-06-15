@@ -2,10 +2,44 @@
 
 # Firestore 設計
 
+- [sharedGroups](#sharedgroups)
 - [users](#users)
   - [books](#books)
   - [groups](#groups)
   - [tags](#tags)
+
+## sharedGroups
+
+### 概要
+
+- グループの公開共有データコレクション
+- ID: 自動生成
+- トップレベルコレクション（ユーザーのサブコレクションではない）
+- 認証不要で読み取り可能（パブリック公開）
+- クライアントから create / delete 可能。update は Cloud Functions の Admin SDK のみ
+
+### 詳細
+
+- books: Array\<SharedBook\> 本の公開情報のスナップショット
+  - amazonUrl: String Amazon詳細ページのURL
+  - author: String | null 著者名
+  - coverImageUrl: String | null 表紙画像URL
+  - tags: Array\<String\> タグの配列
+  - title: String | null 本のタイトル
+- createdAt: Timestamp 共有作成日時
+- groupId: String 元の group ドキュメントID
+- groupLabel: String グループ名
+- ownerName: String 共有元ユーザーの表示名（スナップショット時点。未設定の場合は空文字）
+- uid: String 共有元ユーザーの Firebase Auth UID
+- updatedAt: Timestamp 共有更新日時
+
+### 同期ルール
+
+- グループ名変更時（onUpdateGroup）: `groupLabel` を同期
+- グループ削除時（onDeleteGroup）: 対応する sharedGroups ドキュメントも削除
+- 本の作成時（onCreateBook）: 本の `groups` に含まれる label に紐づく sharedGroups の `books` 配列を再構築
+- 本の更新時（onUpdateBook）: 公開対象フィールド（title, author, coverImageUrl, tags, amazonUrl, groups）が変更された場合、影響する sharedGroups の `books` 配列を再構築
+- 本の削除時（onDeleteBook）: 本の `groups` に含まれる label に紐づく sharedGroups の `books` 配列を再構築
 
 ## users
 
@@ -17,6 +51,7 @@
 ### 詳細
 
 - createdAt: Timestamp 作成日時
+- displayName: String 表示名（共有ページ等で使用。未設定の場合は空文字）
 - email: String 認証に使用したメールアドレス
 - updatedAt: Timestamp 更新日時
 
