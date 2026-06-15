@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
+import { Route as SharedSharedGroupIdRouteImport } from './routes/shared/$sharedGroupId'
 import { Route as AuthedTagsRouteImport } from './routes/_authed/tags'
 import { Route as AuthedSettingsRouteImport } from './routes/_authed/settings'
 import { Route as AuthedGroupsRouteImport } from './routes/_authed/groups'
@@ -31,6 +32,11 @@ const AuthedIndexRoute = AuthedIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthedRoute,
+} as any)
+const SharedSharedGroupIdRoute = SharedSharedGroupIdRouteImport.update({
+  id: '/shared/$sharedGroupId',
+  path: '/shared/$sharedGroupId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthedTagsRoute = AuthedTagsRouteImport.update({
   id: '/tags',
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/groups': typeof AuthedGroupsRoute
   '/settings': typeof AuthedSettingsRoute
   '/tags': typeof AuthedTagsRoute
+  '/shared/$sharedGroupId': typeof SharedSharedGroupIdRoute
   '/demo/tanstack-query': typeof AuthedDemoTanstackQueryRoute
 }
 export interface FileRoutesByTo {
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/groups': typeof AuthedGroupsRoute
   '/settings': typeof AuthedSettingsRoute
   '/tags': typeof AuthedTagsRoute
+  '/shared/$sharedGroupId': typeof SharedSharedGroupIdRoute
   '/': typeof AuthedIndexRoute
   '/demo/tanstack-query': typeof AuthedDemoTanstackQueryRoute
 }
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/_authed/groups': typeof AuthedGroupsRoute
   '/_authed/settings': typeof AuthedSettingsRoute
   '/_authed/tags': typeof AuthedTagsRoute
+  '/shared/$sharedGroupId': typeof SharedSharedGroupIdRoute
   '/_authed/': typeof AuthedIndexRoute
   '/_authed/demo/tanstack-query': typeof AuthedDemoTanstackQueryRoute
 }
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/groups'
     | '/settings'
     | '/tags'
+    | '/shared/$sharedGroupId'
     | '/demo/tanstack-query'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
     | '/groups'
     | '/settings'
     | '/tags'
+    | '/shared/$sharedGroupId'
     | '/'
     | '/demo/tanstack-query'
   id:
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | '/_authed/groups'
     | '/_authed/settings'
     | '/_authed/tags'
+    | '/shared/$sharedGroupId'
     | '/_authed/'
     | '/_authed/demo/tanstack-query'
   fileRoutesById: FileRoutesById
@@ -121,6 +133,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthedRoute: typeof AuthedRouteWithChildren
   LoginRoute: typeof LoginRoute
+  SharedSharedGroupIdRoute: typeof SharedSharedGroupIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -145,6 +158,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AuthedIndexRouteImport
       parentRoute: typeof AuthedRoute
+    }
+    '/shared/$sharedGroupId': {
+      id: '/shared/$sharedGroupId'
+      path: '/shared/$sharedGroupId'
+      fullPath: '/shared/$sharedGroupId'
+      preLoaderRoute: typeof SharedSharedGroupIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authed/tags': {
       id: '/_authed/tags'
@@ -208,6 +228,7 @@ const AuthedRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthedRoute: AuthedRouteWithChildren,
   LoginRoute: LoginRoute,
+  SharedSharedGroupIdRoute: SharedSharedGroupIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -75,7 +75,10 @@ const FirebaseAuthProvider = ({
       } else {
         setCurrentUser(null)
         setUid(null)
-        navigate({ to: '/login' })
+        // 公開ページでは未ログインでもリダイレクトしない
+        if (!window.location.pathname.startsWith('/shared/')) {
+          navigate({ to: '/login' })
+        }
       }
     })
     return () => unsubscribe()

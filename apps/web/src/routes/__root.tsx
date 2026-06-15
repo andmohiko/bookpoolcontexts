@@ -37,11 +37,11 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'Vector Memo',
+        title: 'BookPoolContexts',
       },
       {
         name: 'description',
-        content: 'セマンティック検索メモ帳アプリケーション',
+        content: '読みたい本の管理アプリケーション',
       },
       {
         name: 'theme-color',
@@ -57,7 +57,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       },
       {
         name: 'apple-mobile-web-app-title',
-        content: 'Vector Memo',
+        content: 'BookPoolContexts',
       },
     ],
     links: [
@@ -81,9 +81,11 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   useServiceWorker()
   const location = useLocation()
-  const isAuthPath = location.pathname === '/login'
+  const isPublicPath =
+    location.pathname === '/login' ||
+    location.pathname.startsWith('/shared/')
 
-  if (isAuthPath) {
+  if (isPublicPath) {
     return <>{children}</>
   }
 
