@@ -299,6 +299,7 @@
 - グループ管理画面（`/groups`）の各グループカードに「共有」ボタンを設置する
 - 共有ボタンを押すと、クライアントが Firestore の `sharedGroups` トップレベルコレクションにドキュメントを直接作成する
 - 作成時にグループに属する本の公開情報（タイトル・著者・表紙画像URL・タグ）をスナップショットとして `sharedGroups` ドキュメントに保存する
+- 作成時にユーザーの `displayName` を `ownerName` として `sharedGroups` ドキュメントに保存する
 - 共有リンクの形式は `/shared/{sharedGroupId}` とする
 - 生成された共有リンクをクリップボードにコピーする機能を提供する
 - すでに共有済みのグループは「共有リンクをコピー」ボタンと「共有を解除」ボタンを表示する
@@ -312,7 +313,7 @@
 
 **詳細要件:**
 - `/shared/{sharedGroupId}` は認証不要でアクセスできるパブリックページとする
-- 共有ページにはグループ名と、所属する本のカードグリッドを表示する
+- 共有ページには `ownerName` が存在する場合「{ownerName} の {groupLabel}」、存在しない場合はグループ名のみを見出しとして表示し、所属する本のカードグリッドを表示する
 - 各カードに表示する情報はタイトル・著者・表紙画像・タグのみとする（メモ・foundBy・location・purchasedBy・読了フラグなどの個人情報は含めない）
 - 共有ページのヘッダーにはアプリ名とロゴを表示し、「このアプリを使ってみる」リンクでログイン画面へ誘導する
 
@@ -394,6 +395,19 @@ FR-LIST-004 を参照。
 
 設定画面にログアウトボタンを設置し、Firebase Authentication のセッションをクリアする。
 
+#### FR-SETTINGS-004: 表示名の設定
+
+| 項目 | 内容 |
+|------|------|
+| 概要 | グループ共有ページなどで表示されるユーザー名を設定する機能 |
+| 優先度 | 必須 |
+
+**詳細要件:**
+- 設定画面に「表示名」入力フィールドを追加する
+- 入力値は users コレクションの `displayName` フィールドに保存する
+- 未設定の場合は空文字とする
+- 共有グループ閲覧ページで「{displayName} の {グループ名}」のように表示される
+
 ---
 
 ### 2.8 PWA 対応
@@ -471,6 +485,7 @@ firestore/
 ├── users/
 │   └── {uid}/
 │       ├── createdAt: Timestamp
+│       ├── displayName: string              // 表示名（共有ページ等で使用）
 │       ├── email: string
 │       ├── updatedAt: Timestamp
 │       ├── books/  (サブコレクション)
@@ -508,6 +523,7 @@ firestore/
 │       ├── uid: string                      // 共有元ユーザーの UID
 │       ├── groupId: string                  // 元の group ドキュメントID
 │       ├── groupLabel: string               // グループ名
+│       ├── ownerName: string                // 共有元ユーザーの表示名
 │       ├── books: SharedBook[]              // 本の公開情報スナップショット
 │       ├── createdAt: Timestamp
 │       └── updatedAt: Timestamp
@@ -519,6 +535,7 @@ firestore/
 |-----------|-----|------|
 | uid | string | Firebase Auth UID（ドキュメントID） |
 | createdAt | Timestamp | 作成日時 |
+| displayName | string | 表示名（共有ページ等で使用。未設定の場合は空文字） |
 | email | string | 認証に使用したメールアドレス |
 | updatedAt | Timestamp | 更新日時 |
 
@@ -574,6 +591,7 @@ firestore/
 | uid | string | 共有元ユーザーの Firebase Auth UID |
 | groupId | string | 元の group ドキュメントID |
 | groupLabel | string | グループ名（スナップショット時点） |
+| ownerName | string | 共有元ユーザーの表示名（スナップショット時点。未設定の場合は空文字） |
 | books | SharedBook[] | 本の公開情報の配列（スナップショット） |
 | createdAt | Timestamp | 共有作成日時 |
 | updatedAt | Timestamp | 共有更新日時 |
@@ -670,6 +688,7 @@ export type SharedGroup = {
   uid: string
   groupId: string
   groupLabel: string
+  ownerName: string
   books: SharedBook[]
   createdAt: Date
   updatedAt: Date
@@ -680,10 +699,11 @@ export type CreateSharedGroupDto = Omit<SharedGroup, 'sharedGroupId' | 'createdA
   updatedAt: FieldValue
 }
 
-export type UpdateSharedGroupDto = {
+export type UpdateSharedGroupDtoFromAdmin = {
   groupLabel?: string
+  ownerName?: string
   books?: SharedBook[]
-  updatedAt: FieldValue
+  updatedAt: AdminFieldValue
 }
 ```
 
@@ -860,6 +880,7 @@ export type UpdateSharedGroupDto = {
 ### 5.8 SCR-005: 設定画面
 
 **セクション:**
+- **プロフィール**: 表示名の入力フィールド（共有ページ等で「○○の」と表示される）
 - **テーマ**: ライト / ダーク / デバイスに合わせる の 3 択ボタン
 - **本の表示**: 「読了済みの本を一覧に表示しない」チェックボックス
 - **アカウント**: ログアウトボタン
@@ -872,7 +893,7 @@ export type UpdateSharedGroupDto = {
 │  [BookPoolContexts ロゴ]   [このアプリを使う] │
 ├─────────────────────────────────────────────┤
 │                                             │
-│  📚 Web開発                                 │  ← グループ名
+│  📚 ○○の Web開発                        │  ← ownerName + グループ名
 │                                             │
 │  ┌───┐ ┌───┐ ┌───┐ ┌───┐ ┌───┐           │
 │  │📕 │ │📘 │ │📗 │ │📙 │ │📕 │           │
