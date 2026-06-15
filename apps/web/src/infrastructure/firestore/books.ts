@@ -203,6 +203,22 @@ export const subscribeBooksByTagOperation = (
   })
 }
 
+/** グループに属する本を全件取得する（共有スナップショット作成用） */
+export const fetchAllBooksByGroupOperation = async (
+  uid: Uid,
+  groupLabel: string,
+): Promise<Array<Book>> => {
+  const q = query(
+    booksRef(uid),
+    where('groups', 'array-contains', groupLabel),
+    orderBy('createdAt', 'desc'),
+  )
+  const snapshot = await getDocs(q)
+  return snapshot.docs.map(
+    (d) => ({ bookId: d.id, ...convertDate(d.data(), dateColumns) }) as Book,
+  )
+}
+
 /** 本を作成する */
 export const createBookOperation = async (
   uid: Uid,
