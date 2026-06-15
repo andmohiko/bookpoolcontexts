@@ -15,6 +15,7 @@ import { Toaster } from '@/components/ui/sonner'
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 import TanStackQueryProvider from '../integrations/tanstack-query/root-provider'
 import { useLocation } from '@tanstack/react-router'
+import { useEffect } from 'react'
 import { Providers } from '../providers'
 import { useServiceWorker } from '@/hooks/useServiceWorker'
 import appCss from '../styles.css?url'
@@ -23,7 +24,7 @@ interface MyRouterContext {
   queryClient: QueryClient
 }
 
-const THEME_INIT_SCRIPT = `(function(){try{var stored=window.localStorage.getItem('theme');var mode=(stored==='light'||stored==='dark'||stored==='auto')?stored:'auto';var prefersDark=window.matchMedia('(prefers-color-scheme: dark)').matches;var resolved=mode==='auto'?(prefersDark?'dark':'light'):mode;var root=document.documentElement;root.classList.remove('light','dark');root.classList.add(resolved);if(mode==='auto'){root.removeAttribute('data-theme')}else{root.setAttribute('data-theme',mode)}root.style.colorScheme=resolved;}catch(e){}})();`
+const THEME_INIT_SCRIPT = `(function(){try{var stored=window.localStorage.getItem('theme');var mode=(stored==='light'||stored==='dark'||stored==='auto')?stored:'dark';var prefersDark=window.matchMedia('(prefers-color-scheme: dark)').matches;var resolved=mode==='auto'?(prefersDark?'dark':'light'):mode;var root=document.documentElement;root.classList.remove('light','dark');root.classList.add(resolved);if(mode==='auto'){root.removeAttribute('data-theme')}else{root.setAttribute('data-theme',mode)}root.style.colorScheme=resolved;}catch(e){}})();`
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
   validateSearch: z.object({ tag: z.string().optional(), group: z.string().optional() }),
@@ -104,8 +105,30 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 }
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    const stored = window.localStorage.getItem('theme')
+    const mode =
+      stored === 'light' || stored === 'dark' || stored === 'auto'
+        ? stored
+        : 'dark'
+    const prefersDark = window.matchMedia(
+      '(prefers-color-scheme: dark)',
+    ).matches
+    const resolved =
+      mode === 'auto' ? (prefersDark ? 'dark' : 'light') : mode
+    const root = document.documentElement
+    root.classList.remove('light', 'dark')
+    root.classList.add(resolved)
+    root.style.colorScheme = resolved
+    if (mode === 'auto') {
+      root.removeAttribute('data-theme')
+    } else {
+      root.setAttribute('data-theme', mode)
+    }
+  }, [])
+
   return (
-    <html lang="ja" suppressHydrationWarning>
+    <html lang="ja" className="dark" style={{ colorScheme: 'dark' }} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <HeadContent />

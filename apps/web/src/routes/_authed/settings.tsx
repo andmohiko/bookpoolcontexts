@@ -1,11 +1,21 @@
+import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { MonitorIcon, MoonIcon, SunIcon } from 'lucide-react'
+import { toast } from 'sonner'
 
+import type { UpdateUserDto } from '@bookpoolcontexts/common'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
 import { useHideReadBooks } from '@/hooks/useHideReadBooks'
 import { type ThemeMode, useThemeMode } from '@/hooks/useThemeMode'
+import {
+  fetchUserOperation,
+  updateUserOperation,
+} from '@/infrastructure/firestore/users'
+import { serverTimestamp } from '@/lib/firebase'
 import { useFirebaseAuthContext } from '@/providers/FirebaseAuthProvider'
+import { errorMessage } from '@/utils/errorMessage'
 
 export const Route = createFileRoute('/_authed/settings')({
   component: SettingsPage,
@@ -22,13 +32,61 @@ const themeOptions: Array<{
 ]
 
 const SettingsPage = () => {
-  const { logout } = useFirebaseAuthContext()
+  const { uid, logout } = useFirebaseAuthContext()
   const { mode, setThemeMode } = useThemeMode()
   const { hideReadBooks, setHideReadBooks } = useHideReadBooks()
+  const [displayName, setDisplayName] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    if (!uid) return
+    fetchUserOperation(uid).then((user) => {
+      if (user?.displayName) {
+        setDisplayName(user.displayName)
+      }
+    })
+  }, [uid])
+
+  const handleSaveDisplayName = async (): Promise<void> => {
+    if (!uid) return
+    setIsSaving(true)
+    try {
+      const dto: UpdateUserDto = {
+        displayName,
+        updatedAt: serverTimestamp,
+      }
+      await updateUserOperation(uid, dto)
+      toast.success('表示名を更新しました')
+    } catch (e) {
+      toast.error(errorMessage(e))
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   return (
     <main className="pb-8 pt-14">
       <h1 className="mb-8 text-xl font-semibold">設定</h1>
+
+      <section className="mb-8">
+        <h2 className="mb-4 text-lg font-semibold">プロフィール</h2>
+        <div className="flex max-w-sm items-center gap-2">
+          <Input
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder="表示名"
+          />
+          <Button
+            onClick={handleSaveDisplayName}
+            disabled={isSaving}
+          >
+            {isSaving ? '保存中...' : '保存'}
+          </Button>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          グループ共有ページで「○○ の グループ名」のように表示されます
+        </p>
+      </section>
 
       <section className="mb-8">
         <h2 className="mb-4 text-lg font-semibold">テーマ</h2>

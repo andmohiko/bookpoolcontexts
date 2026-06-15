@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { fetchAllBooksByGroupOperation } from '@/infrastructure/firestore/books'
 import { createSharedGroupOperation } from '@/infrastructure/firestore/sharedGroups'
+import { fetchUserOperation } from '@/infrastructure/firestore/users'
 import { serverTimestamp } from '@/lib/firebase'
 import { useFirebaseAuthContext } from '@/providers/FirebaseAuthProvider'
 import { errorMessage } from '@/utils/errorMessage'
@@ -34,10 +35,12 @@ export const useCreateSharedGroupMutation =
           amazonUrl: book.amazonUrl,
         }))
 
+        const user = await fetchUserOperation(uid)
         const dto: CreateSharedGroupDto = {
           uid,
           groupId: group.groupId,
           groupLabel: group.label,
+          ownerName: user?.displayName ?? '',
           books: sharedBooks,
           createdAt: serverTimestamp,
           updatedAt: serverTimestamp,

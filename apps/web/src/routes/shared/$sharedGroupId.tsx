@@ -47,7 +47,11 @@ function SharedGroupPage() {
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-4 py-8">
       <SharedHeader />
-      <h1 className="mb-6 text-2xl font-bold">{sharedGroup.groupLabel}</h1>
+      <h1 className="mb-6 text-2xl font-bold">
+        {sharedGroup.ownerName
+          ? `${sharedGroup.ownerName} の ${sharedGroup.groupLabel}`
+          : sharedGroup.groupLabel}
+      </h1>
       {sharedGroup.books.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">
           このグループにはまだ本が登録されていません

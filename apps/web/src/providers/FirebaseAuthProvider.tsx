@@ -96,8 +96,12 @@ const FirebaseAuthProvider = ({
         const existingUser = await fetchUserOperation(uid)
         if (!existingUser) {
           // ユーザードキュメントが存在しない場合は作成
+          const email = result.user.email ?? ''
+          const displayName =
+            result.user.displayName ?? email.split('@')[0] ?? ''
           await createUserOperation(uid, {
-            email: result.user.email ?? '',
+            displayName,
+            email,
             createdAt: serverTimestamp,
             updatedAt: serverTimestamp,
           })
