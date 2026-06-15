@@ -3,6 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore'
 import { onDocumentDeleted } from 'firebase-functions/v2/firestore'
 import '~/config/firebase'
 import { updateGroupByLabelOperation } from '~/infrastructure/firestore/groups'
+import { rebuildSharedGroupBooksOperation } from '~/infrastructure/firestore/sharedGroups'
 import {
   deleteTagOperation,
   fetchTagByLabelOperation,
@@ -71,6 +72,21 @@ export const onDeleteBook = onDocumentDeleted(
         }
       }
       console.log('本の削除に伴いタグカウントを更新しました:', bookId, tags)
+    }
+
+    // ===== 共有グループ books 再構築 =====
+    if (groups.length > 0) {
+      for (const groupLabel of groups) {
+        try {
+          await rebuildSharedGroupBooksOperation(uid, groupLabel)
+        } catch (error) {
+          console.error(
+            '共有グループの books 再構築に失敗:',
+            groupLabel,
+            error,
+          )
+        }
+      }
     }
   }),
 )

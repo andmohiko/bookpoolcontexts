@@ -7,10 +7,11 @@ process.env.TZ = timezone
 
 // triggers
 export { onCreateBook } from './triggers/onCreateBook'
-export { onUpdateBook } from './triggers/onUpdateBook'
 export { onDeleteBook } from './triggers/onDeleteBook'
 export { onDeleteGroup } from './triggers/onDeleteGroup'
 export { onDeleteTag } from './triggers/onDeleteTag'
+export { onUpdateBook } from './triggers/onUpdateBook'
+export { onUpdateGroup } from './triggers/onUpdateGroup'
 
 // API
 export const api = onRequest(

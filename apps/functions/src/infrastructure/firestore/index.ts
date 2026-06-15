@@ -8,6 +8,13 @@ export {
   updateGroupOperation,
 } from './groups'
 export {
+  deleteSharedGroupOperation,
+  fetchSharedGroupsByGroupIdOperation,
+  fetchSharedGroupsByGroupLabelOperation,
+  rebuildSharedGroupBooksOperation,
+  updateSharedGroupOperation,
+} from './sharedGroups'
+export {
   createTagOperation,
   deleteTagOperation,
   fetchTagByLabelOperation,

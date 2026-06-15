@@ -3,6 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore'
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore'
 import '~/config/firebase'
 import { updateGroupByLabelOperation } from '~/infrastructure/firestore/groups'
+import { rebuildSharedGroupBooksOperation } from '~/infrastructure/firestore/sharedGroups'
 import {
   createTagOperation,
   deleteTagOperation,
@@ -158,6 +159,34 @@ export const onUpdateBook = onDocumentUpdated(
         added: addedTags,
         removed: removedTags,
       })
+    }
+
+    // ===== 共有グループ books 再構築 =====
+    // 公開対象フィールド（title, author, coverImageUrl, tags, amazonUrl, groups）の変更を検知
+    const sharedFieldsChanged =
+      groupsChanged ||
+      tagsChanged ||
+      before.title !== after.title ||
+      before.author !== after.author ||
+      before.coverImageUrl !== after.coverImageUrl ||
+      before.amazonUrl !== after.amazonUrl
+
+    if (sharedFieldsChanged) {
+      // 影響を受ける全グループ（before + after の和集合）
+      const affectedGroups = Array.from(
+        new Set([...beforeGroups, ...afterGroups]),
+      )
+      for (const groupLabel of affectedGroups) {
+        try {
+          await rebuildSharedGroupBooksOperation(uid, groupLabel)
+        } catch (error) {
+          console.error(
+            '共有グループの books 再構築に失敗:',
+            groupLabel,
+            error,
+          )
+        }
+      }
     }
   }),
 )
