@@ -30,6 +30,7 @@
 | Tag | 本のジャンル（小説、新書、技術書など）を分類するラベル |
 | Location | 本が読める場所（図書館、ブックオフ、本屋、Kindle Unlimitedなど） |
 | PurchasedBy | 本の購入場所・手段（物理本、Kindle、オフィスなど） |
+| SharedGroup | グループを外部に公開共有するためのデータ。共有リンクを通じて認証不要で閲覧可能 |
 | ScrapingStatus | Amazonからの情報取得状態を表すステータス（`scraping` / `completed` / `failed` / `skipped`） |
 | UpdatedBy | Bookドキュメント更新の操作主（`user` / `trigger`）。連鎖トリガー防止のために使用する |
 
@@ -285,7 +286,63 @@
 
 ---
 
-### 2.5 タグ管理機能
+### 2.5 グループ共有機能
+
+#### FR-SHARE-001: グループの共有リンク生成
+
+| 項目 | 内容 |
+|------|------|
+| 概要 | 文脈グループを外部に公開共有するリンクを生成する機能 |
+| 優先度 | 必須 |
+
+**詳細要件:**
+- グループ管理画面（`/groups`）の各グループカードに「共有」ボタンを設置する
+- 共有ボタンを押すと、クライアントが Firestore の `sharedGroups` トップレベルコレクションにドキュメントを直接作成する
+- 作成時にグループに属する本の公開情報（タイトル・著者・表紙画像URL・タグ）をスナップショットとして `sharedGroups` ドキュメントに保存する
+- 共有リンクの形式は `/shared/{sharedGroupId}` とする
+- 生成された共有リンクをクリップボードにコピーする機能を提供する
+- すでに共有済みのグループは「共有リンクをコピー」ボタンと「共有を解除」ボタンを表示する
+
+#### FR-SHARE-002: 共有グループの閲覧
+
+| 項目 | 内容 |
+|------|------|
+| 概要 | 共有リンクを開いた外部ユーザーがグループの本一覧を閲覧できる機能 |
+| 優先度 | 必須 |
+
+**詳細要件:**
+- `/shared/{sharedGroupId}` は認証不要でアクセスできるパブリックページとする
+- 共有ページにはグループ名と、所属する本のカードグリッドを表示する
+- 各カードに表示する情報はタイトル・著者・表紙画像・タグのみとする（メモ・foundBy・location・purchasedBy・読了フラグなどの個人情報は含めない）
+- 共有ページのヘッダーにはアプリ名とロゴを表示し、「このアプリを使ってみる」リンクでログイン画面へ誘導する
+
+#### FR-SHARE-003: 共有グループの自動同期
+
+| 項目 | 内容 |
+|------|------|
+| 概要 | 元グループや所属する本が更新・削除された際に、共有グループのスナップショットを自動同期する機能 |
+| 優先度 | 必須 |
+
+**詳細要件:**
+- グループの label が変更された場合、Cloud Functions の `onUpdateGroup` トリガーが該当する `sharedGroups` ドキュメントの `groupLabel` を同期する
+- グループが削除された場合、Cloud Functions の `onDeleteGroup` トリガーが該当する `sharedGroups` ドキュメントも削除する
+- グループに属する本が追加・更新・削除された場合、Cloud Functions の `onCreateBook` / `onUpdateBook` / `onDeleteBook` トリガーが、その本が属するグループに紐づく `sharedGroups` ドキュメントの `books` 配列を最新状態に再構築する
+- `books` 配列の再構築は、該当グループの label を `groups` に含む全 Book を取得し、公開情報（title, author, coverImageUrl, tags, amazonUrl）のみを抽出して上書きする
+
+#### FR-SHARE-004: 共有の解除
+
+| 項目 | 内容 |
+|------|------|
+| 概要 | 共有済みグループの共有を手動で解除する機能 |
+| 優先度 | 必須 |
+
+**詳細要件:**
+- グループ管理画面から共有済みグループの「共有を解除」ボタンを押すと確認ダイアログを表示し、確認後にクライアントが Firestore から `sharedGroups` ドキュメントを直接削除する
+- 共有解除後、共有リンクにアクセスすると「このページは公開されていません」と表示する
+
+---
+
+### 2.6 タグ管理機能
 
 #### FR-TAG-001: タグの作成
 
@@ -315,7 +372,7 @@
 
 ---
 
-### 2.6 設定機能
+### 2.7 設定機能
 
 #### FR-SETTINGS-001: テーマモードの切り替え
 
@@ -339,7 +396,7 @@ FR-LIST-004 を参照。
 
 ---
 
-### 2.7 PWA 対応
+### 2.8 PWA 対応
 
 #### FR-PWA-001: インストール可能な PWA としての提供
 
@@ -355,7 +412,7 @@ FR-LIST-004 を参照。
 
 ---
 
-### 2.8 キーボードショートカット
+### 2.9 キーボードショートカット
 
 | ショートカット | 動作 |
 |---------------|------|
@@ -446,6 +503,14 @@ firestore/
 │               ├── createdAt: Timestamp
 │               ├── label: string           // normalizeTagLabel で正規化済み
 │               └── updatedAt: Timestamp
+├── sharedGroups/
+│   └── {sharedGroupId}/
+│       ├── uid: string                      // 共有元ユーザーの UID
+│       ├── groupId: string                  // 元の group ドキュメントID
+│       ├── groupLabel: string               // グループ名
+│       ├── books: SharedBook[]              // 本の公開情報スナップショット
+│       ├── createdAt: Timestamp
+│       └── updatedAt: Timestamp
 ```
 
 ### 4.2 users コレクション
@@ -501,7 +566,31 @@ firestore/
 
 > ℹ️ `tags` コレクションのドキュメントはクライアントからは作成しない。Cloud Functions の Admin SDK 経由でのみ作成される（Firestore ルールでクライアント `create` を禁止）。
 
-### 4.6 TypeScript 型定義
+### 4.6 sharedGroups コレクション
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| sharedGroupId | string | 自動生成ID（ドキュメントID） |
+| uid | string | 共有元ユーザーの Firebase Auth UID |
+| groupId | string | 元の group ドキュメントID |
+| groupLabel | string | グループ名（スナップショット時点） |
+| books | SharedBook[] | 本の公開情報の配列（スナップショット） |
+| createdAt | Timestamp | 共有作成日時 |
+| updatedAt | Timestamp | 共有更新日時 |
+
+**SharedBook 型（books 配列の各要素）:**
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| title | string \| null | 本のタイトル |
+| author | string \| null | 著者名 |
+| coverImageUrl | string \| null | 表紙画像URL |
+| tags | string[] | タグ label の配列 |
+| amazonUrl | string | Amazon 詳細ページの URL |
+
+> ℹ️ `sharedGroups` はトップレベルコレクションとする（ユーザーのサブコレクションではない）。認証不要で読み取り可能にするため。書き込みは Cloud Functions（Firestore トリガー）および認証済みクライアントからのみ許可する。
+
+### 4.7 TypeScript 型定義
 
 共通型は `packages/common/src/entities/` に配置し、`@bookpoolcontexts/common` として web と functions の両方から参照する。Entity 型と DTO 型を分離し、タイムスタンプは Entity 側では `Date`、DTO 側では `FieldValue` で表現する（Firestore 実装ルールに準拠）。
 
@@ -561,6 +650,43 @@ export type UpdateBookDto = {
 
 Group / Tag / User も同様のパターンで `groupId` / `tagId` / `uid` を ID フィールドとして持ち、CreateDto / UpdateDto を定義する。Cloud Functions 側（firebase-admin）用には `UpdateBookDtoFromAdmin` / `UpdateGroupDtoFromAdmin` / `CreateTagDtoFromAdmin` / `UpdateTagDtoFromAdmin` などの Admin 用 DTO を別途定義している。
 
+```typescript
+// packages/common/src/entities/SharedGroup.ts
+import type { FieldValue } from 'firebase/firestore'
+
+export const sharedGroupCollection = 'sharedGroups' as const
+export type SharedGroupId = string
+
+export type SharedBook = {
+  title: string | null
+  author: string | null
+  coverImageUrl: string | null
+  tags: string[]
+  amazonUrl: string
+}
+
+export type SharedGroup = {
+  sharedGroupId: SharedGroupId
+  uid: string
+  groupId: string
+  groupLabel: string
+  books: SharedBook[]
+  createdAt: Date
+  updatedAt: Date
+}
+
+export type CreateSharedGroupDto = Omit<SharedGroup, 'sharedGroupId' | 'createdAt' | 'updatedAt'> & {
+  createdAt: FieldValue
+  updatedAt: FieldValue
+}
+
+export type UpdateSharedGroupDto = {
+  groupLabel?: string
+  books?: SharedBook[]
+  updatedAt: FieldValue
+}
+```
+
 ---
 
 ## 5. 画面設計
@@ -575,6 +701,7 @@ Group / Tag / User も同様のパターンで `groupId` / `tagId` / `uid` を I
 | SCR-004 | タグ管理画面 | `/tags` | 必要 | タグの一覧、編集、削除 |
 | SCR-005 | 設定画面 | `/settings` | 必要 | テーマ、読了非表示、ログアウト |
 | SCR-006 | About 画面 | `/about` | 必要 | アプリの説明 |
+| SCR-007 | 共有グループ閲覧画面 | `/shared/$sharedGroupId` | 不要 | 共有リンクから閲覧するパブリックページ |
 
 > 本の登録／編集／削除は画面遷移ではなくホーム画面上のモーダル（`BookRegistrationModal` / `BookEditModal` / `DeleteBookAlertDialog`）で行う。そのため `/new` や `/book/$bookId`、`/group/$groupId` といった固有の画面ルートは持たない。
 
@@ -699,13 +826,13 @@ Group / Tag / User も同様のパターンで `groupId` / `tagId` / `uid` を I
 ├─────────────────────────────────────────────┤
 │                                             │
 │  ┌─────────────────────────────────────┐   │
-│  │ Web開発                     (12冊)  │   │
+│  │ Web開発            (12冊) [共有] [編集]│   │
 │  └─────────────────────────────────────┘   │
 │  ┌─────────────────────────────────────┐   │
-│  │ キャリア論                  ( 5冊)  │   │
+│  │ キャリア論          ( 5冊) [🔗コピー][編集]│  ← 共有済み
 │  └─────────────────────────────────────┘   │
 │  ┌─────────────────────────────────────┐   │
-│  │ 哲学・思想                  ( 8冊)  │   │
+│  │ 哲学・思想          ( 8冊) [共有] [編集]│   │
 │  └─────────────────────────────────────┘   │
 │                                             │
 │                    [+]                      │  ← グループ追加
@@ -714,8 +841,9 @@ Group / Tag / User も同様のパターンで `groupId` / `tagId` / `uid` を I
 
 **コンポーネント:**
 - GroupList
-- GroupCard (label, count)
+- GroupCard (label, count, 共有ボタン / 共有リンクコピーボタン)
 - CreateGroupDialog / EditGroupDialog / DeleteGroupAlertDialog
+- ShareGroupDialog（共有確認・共有リンクコピー・共有更新・共有解除）
 
 ### 5.7 SCR-004: タグ管理画面
 
@@ -735,6 +863,39 @@ Group / Tag / User も同様のパターンで `groupId` / `tagId` / `uid` を I
 - **テーマ**: ライト / ダーク / デバイスに合わせる の 3 択ボタン
 - **本の表示**: 「読了済みの本を一覧に表示しない」チェックボックス
 - **アカウント**: ログアウトボタン
+
+### 5.9 SCR-007: 共有グループ閲覧画面
+
+**レイアウト:**
+```
+┌─────────────────────────────────────────────┐
+│  [BookPoolContexts ロゴ]   [このアプリを使う] │
+├─────────────────────────────────────────────┤
+│                                             │
+│  📚 Web開発                                 │  ← グループ名
+│                                             │
+│  ┌───┐ ┌───┐ ┌───┐ ┌───┐ ┌───┐           │
+│  │📕 │ │📘 │ │📗 │ │📙 │ │📕 │           │
+│  │   │ │   │ │   │ │   │ │   │           │
+│  │タイトル│タイトル│タイトル│タイトル│タイトル│           │
+│  │著者│ │著者│ │著者│ │著者│ │著者│           │
+│  │#タグ│ │#タグ│ │#タグ│ │#タグ│ │#タグ│           │
+│  └───┘ └───┘ └───┘ └───┘ └───┘           │
+│                                             │
+└─────────────────────────────────────────────┘
+```
+
+**特徴:**
+- 認証不要のパブリックページ
+- ヘッダーにアプリロゴと「このアプリを使ってみる」リンク（→ `/login`）を表示
+- グループ名を見出しとして表示
+- カードグリッドで本の表紙画像・タイトル・著者・タグを表示
+- メモ・foundBy・location・purchasedBy・読了フラグなどの個人情報は表示しない
+- 存在しない `sharedGroupId` の場合は「このページは公開されていません」と表示
+
+**コンポーネント:**
+- SharedGroupHeader（ロゴ + CTA リンク）
+- SharedBookList / SharedBookCard（表紙・タイトル・著者・タグのみ）
 
 ---
 
@@ -775,6 +936,7 @@ Group / Tag / User も同様のパターンで `groupId` / `tagId` / `uid` を I
 2. スクレイピング結果で Book を更新（`updatedBy: 'trigger'`）。成否に応じて `scrapingStatus` を `completed` / `failed` に遷移
 3. 本の `groups` 配列に含まれる各 group label の `count` をインクリメント
 4. 本の `tags` 配列を正規化し、各タグの `count` をインクリメント（未知のタグは `count: 1` で新規作成）
+5. 本の `groups` に含まれる label に紐づく `sharedGroups` ドキュメントが存在する場合、`books` 配列を最新状態に再構築する
 
 #### onUpdateBook
 
@@ -789,6 +951,7 @@ Group / Tag / User も同様のパターンで `groupId` / `tagId` / `uid` を I
 2. `scrapingStatus` が `'scraping'` に遷移したときは再フェッチとして `scrapeAndUpdateBook` を実行
 3. `groups` の差分を算出し、追加されたラベルの `count` をインクリメント、削除されたラベルの `count` をデクリメント
 4. `tags` の差分を算出し、追加タグは count +1（未知のタグは新規作成）、削除タグは count -1（count<=1 ならドキュメント削除）
+5. 本の `groups`（変更前・変更後いずれか）に含まれる label に紐づく `sharedGroups` ドキュメントが存在する場合、`books` 配列を最新状態に再構築する
 
 #### onDeleteBook
 
@@ -801,6 +964,18 @@ Group / Tag / User も同様のパターンで `groupId` / `tagId` / `uid` を I
 **処理内容:**
 - 削除された Book の `groups` / `tags` を取り出し、それぞれの count を -1 する
 - count<=1 のタグはドキュメント自体を削除する
+- 削除された本の `groups` に含まれる label に紐づく `sharedGroups` ドキュメントが存在する場合、`books` 配列を最新状態に再構築する
+
+#### onUpdateGroup
+
+| 項目 | 内容 |
+|------|------|
+| 関数名 | `onUpdateGroup` |
+| タイプ | Firestore onDocumentUpdated トリガー |
+| トリガーパス | `users/{uid}/groups/{groupId}` |
+
+**処理内容:**
+- `label` が変更された場合、該当 `groupId` に紐づく `sharedGroups` ドキュメントの `groupLabel` を同期する
 
 #### onDeleteGroup
 
@@ -812,6 +987,7 @@ Group / Tag / User も同様のパターンで `groupId` / `tagId` / `uid` を I
 
 **処理内容:**
 - 削除された group の label を読み出し、ユーザーの全 Book から当該 label を `groups` 配列から除去する
+- 削除された group の `groupId` に紐づく `sharedGroups` ドキュメントが存在する場合、そのドキュメントも削除する
 
 #### onDeleteTag
 
@@ -858,6 +1034,10 @@ Group / Tag / User も同様のパターンで `groupId` / `tagId` / `uid` を I
 | グループ作成／更新／削除 | `features/groups/hooks` | label ベース管理 |
 | タグ一覧購読 | `useTags` | 全件取得 |
 | タグ編集／削除 | `features/tags/hooks` | 作成はトリガー経由のみ |
+| 共有グループ作成 | `useCreateSharedGroupMutation` / `createSharedGroupOperation` | Firestore に直接書き込み。グループの本を取得しスナップショットを作成 |
+| 共有グループ解除 | `useDeleteSharedGroupMutation` / `deleteSharedGroupOperation` | Firestore から直接削除 |
+| 共有グループ取得 | `useSharedGroup` / `getSharedGroupOperation` | Firestore から直接読み取り（認証不要） |
+| 共有状態の購読 | `useSharedGroups` / `subscribeSharedGroupsOperation` | 自分が作成した共有グループ一覧をリアルタイム購読 |
 
 ---
 
@@ -914,6 +1094,8 @@ bookpoolcontexts/
 │   │       │   ├── __root.tsx
 │   │       │   ├── login.tsx              # /login
 │   │       │   ├── _authed.tsx            # 認証ガード用レイアウト
+│   │       │   ├── shared/
+│   │       │   │   └── $sharedGroupId.tsx # /shared/$sharedGroupId（認証不要）
 │   │       │   └── _authed/
 │   │       │       ├── index.tsx          # / (ホーム)
 │   │       │       ├── groups.tsx         # /groups
@@ -926,7 +1108,8 @@ bookpoolcontexts/
 │   │       │   │   ├── hooks/              # useBooks, useCreateBookMutation, useUpdateBookMutation, useDeleteBookMutation, useRefetchBookMutation
 │   │       │   │   ├── schemas/            # bookRegistrationSchema / bookEditSchema (Zod)
 │   │       │   │   └── utils/              # parseAmazonHtml
-│   │       │   ├── groups/                  # GroupList, GroupSelectDropdown, CreateGroupDialog, EditGroupDialog, DeleteGroupAlertDialog, useGroups
+│   │       │   ├── groups/                  # GroupList, GroupSelectDropdown, CreateGroupDialog, EditGroupDialog, DeleteGroupAlertDialog, ShareGroupDialog, useGroups
+│   │       │   ├── shared/                  # SharedBookList, SharedBookCard, SharedGroupHeader, useSharedGroup
 │   │       │   └── tags/                    # TagList, TagSuggestionDropdown, EditTagDialog, DeleteTagAlertDialog, useTags
 │   │       ├── components/                  # 共通コンポーネント（SideNav, Header, Footer, ThemeToggle, ui/）
 │   │       ├── hooks/                       # useHideReadBooks, useThemeMode, useKeyboardShortcut, useDisclosure, usePWAInstall, useServiceWorker など
@@ -951,9 +1134,10 @@ bookpoolcontexts/
 │           ├── services/
 │           │   └── scrapeBook.ts
 │           ├── api/
-│           │   └── health/test.ts
+│           │   ├── health/test.ts
+│           │   └── sharedGroups/             # 共有グループ CRUD API
 │           ├── infrastructure/
-│           │   └── firestore/               # books, groups, tags の Admin SDK Operations
+│           │   └── firestore/               # books, groups, tags, sharedGroups の Admin SDK Operations
 │           ├── lib/
 │           │   ├── amazon.ts                # Amazon スクレイピング
 │           │   └── firebase.ts
@@ -967,6 +1151,7 @@ bookpoolcontexts/
 │           │   ├── Auth.ts
 │           │   ├── Book.ts
 │           │   ├── Group.ts
+│           │   ├── SharedGroup.ts
 │           │   ├── Tag.ts
 │           │   └── User.ts
 │           └── utils/                       # normalizeTagLabel など
@@ -1038,6 +1223,11 @@ service cloud.firestore {
         allow delete: if isSignedIn() && isUser(userId);
         // create は Cloud Functions（Admin SDK）のみ許可
       }
+    }
+
+    match /sharedGroups/{sharedGroupId} {
+      allow read: if true;  // 認証不要でパブリック読み取り可能
+      // create, update, delete は Cloud Functions（Admin SDK）のみ許可
     }
   }
 }
@@ -1158,6 +1348,7 @@ VITE_FIREBASE_APP_ID=xxx
 | 2026-04-07 | 1.0 | 初版作成 | - |
 | 2026-04-08 | 1.1 | 本の登録フローをAmazon検索方式からURL直接入力方式に変更。title/author/coverImageUrl/pagesはクライアントからnullで登録し、onCreateBookトリガーで自動取得する方式に変更。Amazon検索API廃止 | - |
 | 2026-04-11 | 1.2 | 実装に合わせて全面更新。Book に `scrapingStatus` / `updatedBy` 追加、HTML 直接入力フォールバック、再フェッチ機能、`onUpdateBook` / `onDeleteBook` / `onDeleteGroup` / `onDeleteTag` トリガー、タグ管理画面、設定画面（テーマ／読了非表示）、PWA 対応、キーボードショートカット、モノレポ構成・フィールド命名（`bookId` / `tagId` / `groupId`）、Firestore スキーマバリデーションルールを追記 | - |
+| 2026-06-15 | 1.3 | グループ共有機能（FR-SHARE-001〜004）を追加。`sharedGroups` トップレベルコレクション、共有リンク生成・閲覧・自動同期・解除機能、`onUpdateGroup` トリガー新設、既存トリガーに共有グループ同期処理を追加、公開ページ（`/shared/{sharedGroupId}`）、Firestore セキュリティルール追加 | - |
 
 ---
 
