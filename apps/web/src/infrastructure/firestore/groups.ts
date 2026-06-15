@@ -29,13 +29,13 @@ const groupsRef = (uid: Uid) =>
 const groupDocRef = (uid: Uid, groupId: GroupId) =>
   doc(db, userCollection, uid, groupCollection, groupId)
 
-/** グループ一覧をリアルタイム購読する（label昇順） */
+/** グループ一覧をリアルタイム購読する（更新日時の降順） */
 export const subscribeGroupsOperation = (
   uid: Uid,
   setter: (groups: Array<Group>) => void,
   onError?: (error: Error) => void,
 ): Unsubscribe => {
-  const q = query(groupsRef(uid), orderBy('label', 'asc'))
+  const q = query(groupsRef(uid), orderBy('updatedAt', 'desc'))
   return onSnapshot(
     q,
     (snapshot) => {

@@ -1,3 +1,4 @@
+import dayjs from 'dayjs'
 import { useEffect, useState } from 'react'
 import type { Tag } from '@bookpoolcontexts/common'
 import { subscribeTagsOperation } from '@/infrastructure/firestore/tags'
@@ -23,7 +24,7 @@ export const useTags = (): UseTagsReturn => {
     const unsubscribe = subscribeTagsOperation(
       uid,
       (updatedTags) => {
-        setTags([...updatedTags].sort((a, b) => b.count - a.count))
+        setTags([...updatedTags].sort((a, b) => dayjs(b.updatedAt).diff(dayjs(a.updatedAt))))
         setIsLoading(false)
       },
       (err) => {

@@ -34,3 +34,7 @@ $ pnpm functions pre-build
 
 - パスエイリアスは `@/` を使用すること（例: `@/components/ui/button`）
 - `#/` は使用禁止。`package.json` の `imports` フィールドで `@/*` のみ定義されている
+
+## 日付操作
+
+- javascriptのDateを使わず、インストールされている日付操作ライブラリを使用すること

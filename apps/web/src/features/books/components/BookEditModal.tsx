@@ -124,124 +124,126 @@ export const BookEditModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
+      <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden sm:max-w-md">
         <DialogHeader>
           <DialogTitle>本を編集</DialogTitle>
         </DialogHeader>
 
-        {book.coverImageUrl && (
-          <div className="flex justify-center">
-            <img
-              src={book.coverImageUrl}
-              alt={book.title ?? ''}
-              className="h-32 rounded-md object-cover"
-            />
-          </div>
-        )}
+        <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-4 space-y-4">
+            {book.coverImageUrl && (
+              <div className="flex justify-center">
+                <img
+                  src={book.coverImageUrl}
+                  alt={book.title ?? ''}
+                  className="h-32 rounded-md object-cover"
+                />
+              </div>
+            )}
 
-        {book.title && (
-          <p className="text-center text-sm font-medium">{book.title}</p>
-        )}
-        {book.author && (
-          <p className="text-center text-xs text-muted-foreground">{book.author}</p>
-        )}
+            {book.title && (
+              <p className="text-center text-sm font-medium">{book.title}</p>
+            )}
+            {book.author && (
+              <p className="text-center text-xs text-muted-foreground">{book.author}</p>
+            )}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-2">
-            <Label>タグ</Label>
-            <div className="flex flex-wrap gap-1.5">
-              {tags.map((tag) => (
-                <Badge key={tag} variant="secondary" className="gap-1">
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => removeTag(tag)}
-                    className="ml-0.5 rounded-full hover:bg-muted"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-            <Input
-              placeholder="タグを入力してEnterで追加"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={handleTagKeyDown}
-            />
-            <TagSuggestionDropdown
-              tagInput={tagInput}
-              activeTags={tags}
-              onSelect={addTag}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="edit-foundBy">どこで見つけたか</Label>
-            <Input
-              id="edit-foundBy"
-              placeholder="SNS、友人の推薦、書店で見かけたなど"
-              {...register('foundBy')}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="edit-location">どこで読めるか</Label>
-            <Input
-              id="edit-location"
-              placeholder="図書館、ブックオフ、Kindle Unlimitedなど"
-              {...register('location')}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>購入場所</Label>
-            <div className="flex gap-4">
-              {PURCHASED_BY_OPTIONS.map((option) => (
-                <label
-                  key={option}
-                  className="flex items-center gap-2 text-sm"
-                >
-                  <Checkbox
-                    checked={purchasedBy.includes(option)}
-                    onCheckedChange={() => togglePurchasedBy(option)}
-                  />
-                  {option}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>グループ</Label>
-            <GroupSelectDropdown
-              selectedGroups={groups}
-              onChange={(labels) => setValue('groups', labels)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="edit-note">メモ</Label>
-            <Textarea
-              id="edit-note"
-              placeholder="なぜこの本を読みたいか、期待することなど"
-              rows={3}
-              {...register('note')}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>読了状態</Label>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={isRead}
-                onCheckedChange={(v) => setValue('isRead', v === true)}
+            <div className="space-y-2">
+              <Label>タグ</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {tags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="gap-1">
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => removeTag(tag)}
+                      className="ml-0.5 rounded-full hover:bg-muted"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+              <Input
+                placeholder="タグを入力してEnterで追加"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={handleTagKeyDown}
               />
-              読み終わった
-            </label>
+              <TagSuggestionDropdown
+                tagInput={tagInput}
+                activeTags={tags}
+                onSelect={addTag}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-foundBy">どこで見つけたか</Label>
+              <Input
+                id="edit-foundBy"
+                placeholder="SNS、友人の推薦、書店で見かけたなど"
+                {...register('foundBy')}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-location">どこで読めるか</Label>
+              <Input
+                id="edit-location"
+                placeholder="図書館、ブックオフ、Kindle Unlimitedなど"
+                {...register('location')}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>購入場所</Label>
+              <div className="flex gap-4">
+                {PURCHASED_BY_OPTIONS.map((option) => (
+                  <label
+                    key={option}
+                    className="flex items-center gap-2 text-sm"
+                  >
+                    <Checkbox
+                      checked={purchasedBy.includes(option)}
+                      onCheckedChange={() => togglePurchasedBy(option)}
+                    />
+                    {option}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>グループ</Label>
+              <GroupSelectDropdown
+                selectedGroups={groups}
+                onChange={(labels) => setValue('groups', labels)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-note">メモ</Label>
+              <Textarea
+                id="edit-note"
+                placeholder="なぜこの本を読みたいか、期待することなど"
+                rows={3}
+                {...register('note')}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>読了状態</Label>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={isRead}
+                  onCheckedChange={(v) => setValue('isRead', v === true)}
+                />
+                読み終わった
+              </label>
+            </div>
           </div>
 
-          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
+          <DialogFooter className="flex-col gap-2 pt-4 sm:flex-row sm:justify-between">
             <Button
               type="button"
               variant="destructive"
