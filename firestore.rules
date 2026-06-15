@@ -19,8 +19,9 @@ service cloud.firestore {
 
     // User のスキーマバリデーション
     function isValidUserSchema(requestData) {
-      return requestData.size() == 3
+      return requestData.size() == 4
         && 'createdAt' in requestData && requestData.createdAt is timestamp
+        && 'displayName' in requestData && requestData.displayName is string
         && 'email' in requestData && requestData.email is string
         && 'updatedAt' in requestData && requestData.updatedAt is timestamp;
     }
@@ -67,10 +68,11 @@ service cloud.firestore {
 
     // SharedGroup のスキーマバリデーション
     function isValidSharedGroupSchema(requestData) {
-      return requestData.size() == 6
+      return requestData.size() == 7
         && 'uid' in requestData && requestData.uid is string
         && 'groupId' in requestData && requestData.groupId is string
         && 'groupLabel' in requestData && requestData.groupLabel is string
+        && 'ownerName' in requestData && requestData.ownerName is string
         && 'books' in requestData && requestData.books is list
         && 'createdAt' in requestData && requestData.createdAt is timestamp
         && 'updatedAt' in requestData && requestData.updatedAt is timestamp;

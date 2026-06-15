@@ -22,6 +22,7 @@ export type SharedGroup = {
   uid: string
   groupId: string
   groupLabel: string
+  ownerName: string
   books: SharedBook[]
   createdAt: Date
   updatedAt: Date
@@ -39,6 +40,7 @@ export type CreateSharedGroupDto = Omit<
 /** firebase-admin を使用した更新用DTO */
 export type UpdateSharedGroupDtoFromAdmin = {
   groupLabel?: string
+  ownerName?: string
   books?: SharedBook[]
   updatedAt: AdminFieldValue
 }

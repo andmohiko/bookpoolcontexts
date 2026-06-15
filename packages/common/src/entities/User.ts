@@ -9,6 +9,7 @@ export const userCollection = 'users' as const
 export type User = {
   uid: Uid
   createdAt: Date
+  displayName: string
   email: string
   updatedAt: Date
 }
@@ -21,6 +22,7 @@ export type CreateUserDto = Omit<User, 'uid' | 'createdAt' | 'updatedAt'> & {
 
 /** 更新用DTO */
 export type UpdateUserDto = {
+  displayName?: User['displayName']
   email?: User['email']
   updatedAt: FieldValue
 }
