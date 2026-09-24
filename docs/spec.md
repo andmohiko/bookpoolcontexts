@@ -355,7 +355,7 @@
 **詳細要件:**
 - 本の登録・編集モーダルでタグを自由入力で追加できる（Enter キーで確定）
 - TagSuggestionDropdown により、入力中のテキストにマッチする既存タグをオートコンプリートで表示する
-- タグ label は `normalizeTagLabel`（前後空白除去・全角→半角変換など）で正規化され、重複は弾く
+- タグ label は `normalizeTagLabel`（前後空白除去・Unicode NFC 正規化）で正規化され、重複は弾く
 - タグの Firestore ドキュメントはクライアントからは作成しない。Cloud Functions の `onCreateBook` / `onUpdateBook` トリガーが、本の保存時に未知のタグを `count: 1` で新規作成する（Firestore ルールでもクライアントからの `create` を禁止している）
 
 #### FR-TAG-002: タグの編集・削除
@@ -1040,7 +1040,7 @@ export type UpdateSharedGroupDtoFromAdmin = {
 
 ### 6.3 クライアントサイドAPI（Firestore 直接アクセス）
 
-クライアントは Firestore の `onSnapshot` によるリアルタイム購読を中心に実装されている（TanStack Query ではなく、Operations 層と `useEffect` ベースのカスタムフックで管理）。データ操作は `apps/web/src/infrastructure/firestore/` の Operations 層にカプセル化する。
+クライアントは Firestore の `onSnapshot` によるリアルタイム購読を中心に実装されている（Operations 層と `useEffect` ベースのカスタムフックで管理）。TanStack Query はインストールされているが、主要なデータ層には使用していない。データ操作は `apps/web/src/infrastructure/firestore/` の Operations 層にカプセル化する。
 
 | 操作 | フック / Operation | 説明 |
 |------|--------------------|------|
@@ -1078,6 +1078,7 @@ export type UpdateSharedGroupDtoFromAdmin = {
 | sonner | トースト通知 |
 | lucide-react | アイコン |
 | Firebase SDK (web) | Firestore / Auth のクライアント SDK |
+| dayjs | 日付操作ライブラリ |
 | Vite | ビルドツール（TanStack Start 内蔵） |
 | Service Worker（PWA）| インストール可能な PWA 対応 |
 
@@ -1087,9 +1088,10 @@ export type UpdateSharedGroupDtoFromAdmin = {
 |------|------|
 | Firebase Authentication | ユーザー認証（Google OAuth） |
 | Cloud Firestore | NoSQL データベース（`onSnapshot` によるリアルタイム同期） |
-| Firebase Functions v2 | サーバーレス関数（Firestore トリガー、HTTPS API）|
+| Firebase Functions v2 | サーバーレス関数（Firestore トリガー、HTTPS API）、Node.js 22 ランタイム |
 | puppeteer-core + @sparticuz/chromium | Cloud Functions 上での Amazon 詳細ページのスクレイピング |
 | express + express-promise-router | HTTPS API ルーティング |
+| express-validator | リクエストバリデーション |
 | Firebase Hosting | 静的ホスティング + CDN |
 
 ### 7.3 開発ツール
@@ -1097,7 +1099,9 @@ export type UpdateSharedGroupDtoFromAdmin = {
 | ツール | 用途 |
 |--------|------|
 | pnpm | パッケージマネージャー |
-| ESLint + Prettier | コード品質・フォーマット |
+| Turborepo | モノレポタスクランナー |
+| Biome | コード品質・フォーマット（Lint + Format） |
+| tsup | Cloud Functions ビルドツール |
 | Vitest | ユニットテスト |
 | GitHub Actions | CI/CD |
 | Firebase Emulator Suite | ローカル開発環境 |
@@ -1129,11 +1133,11 @@ bookpoolcontexts/
 │   │       │   │   ├── hooks/              # useBooks, useCreateBookMutation, useUpdateBookMutation, useDeleteBookMutation, useRefetchBookMutation
 │   │       │   │   ├── schemas/            # bookRegistrationSchema / bookEditSchema (Zod)
 │   │       │   │   └── utils/              # parseAmazonHtml
-│   │       │   ├── groups/                  # GroupList, GroupSelectDropdown, CreateGroupDialog, EditGroupDialog, DeleteGroupAlertDialog, ShareGroupDialog, useGroups
+│   │       │   ├── groups/                  # GroupList, GroupCheckboxList, GroupSelectDropdown, CreateGroupDialog, EditGroupDialog, DeleteGroupAlertDialog, ShareGroupDialog, useGroups
 │   │       │   ├── shared/                  # SharedBookList, SharedBookCard, SharedGroupHeader, useSharedGroup
-│   │       │   └── tags/                    # TagList, TagSuggestionDropdown, EditTagDialog, DeleteTagAlertDialog, useTags
+│   │       │   └── tags/                    # TagList, TagSuggestionDropdown, EditTagDialog, DeleteTagAlertDialog, useTags, useRecentTags
 │   │       ├── components/                  # 共通コンポーネント（SideNav, Header, Footer, ThemeToggle, ui/）
-│   │       ├── hooks/                       # useHideReadBooks, useThemeMode, useKeyboardShortcut, useDisclosure, usePWAInstall, useServiceWorker など
+│   │       ├── hooks/                       # useHideReadBooks, useThemeMode, useKeyboardShortcut, useDisclosure, usePWAInstall, useServiceWorker, use-mobile など
 │   │       ├── infrastructure/
 │   │       │   └── firestore/               # books.ts, groups.ts, tags.ts, users.ts（Operations 層）
 │   │       ├── providers/
@@ -1141,7 +1145,9 @@ bookpoolcontexts/
 │   │       ├── lib/
 │   │       │   └── firebase.ts              # Firebase 初期化
 │   │       └── utils/
-│   │           └── convertDate.ts           # Timestamp → Date 変換
+│   │           ├── array.ts                 # 配列ユーティリティ
+│   │           ├── convertDate.ts           # Timestamp → Date 変換
+│   │           └── errorMessage.ts          # エラーメッセージ整形
 │   └── functions/                           # Firebase Functions v2
 │       └── src/
 │           ├── index.ts                     # エクスポート集約
@@ -1150,13 +1156,13 @@ bookpoolcontexts/
 │           │   ├── onCreateBook.ts
 │           │   ├── onUpdateBook.ts
 │           │   ├── onDeleteBook.ts
+│           │   ├── onUpdateGroup.ts
 │           │   ├── onDeleteGroup.ts
 │           │   └── onDeleteTag.ts
 │           ├── services/
 │           │   └── scrapeBook.ts
 │           ├── api/
-│           │   ├── health/test.ts
-│           │   └── sharedGroups/             # 共有グループ CRUD API
+│           │   └── health/test.ts
 │           ├── infrastructure/
 │           │   └── firestore/               # books, groups, tags, sharedGroups の Admin SDK Operations
 │           ├── lib/
@@ -1164,7 +1170,10 @@ bookpoolcontexts/
 │           │   └── firebase.ts
 │           ├── config/firebase.ts
 │           ├── middleware/auth.ts
-│           └── utils/triggerOnce.ts
+│           └── utils/
+│               ├── convertDate.ts           # Timestamp → Date 変換
+│               ├── ogp.ts                   # OGP情報取得ユーティリティ
+│               └── triggerOnce.ts           # 冪等性担保
 ├── packages/
 │   └── common/                              # 共通型定義（@bookpoolcontexts/common）
 │       └── src/
@@ -1248,7 +1257,9 @@ service cloud.firestore {
 
     match /sharedGroups/{sharedGroupId} {
       allow read: if true;  // 認証不要でパブリック読み取り可能
-      // create, update, delete は Cloud Functions（Admin SDK）のみ許可
+      allow create: if isSignedIn() && requestData().uid == request.auth.uid && isValidSharedGroupSchema(requestData());
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+      // update は Cloud Functions（Admin SDK）のみ許可
     }
   }
 }
@@ -1370,6 +1381,7 @@ VITE_FIREBASE_APP_ID=xxx
 | 2026-04-08 | 1.1 | 本の登録フローをAmazon検索方式からURL直接入力方式に変更。title/author/coverImageUrl/pagesはクライアントからnullで登録し、onCreateBookトリガーで自動取得する方式に変更。Amazon検索API廃止 | - |
 | 2026-04-11 | 1.2 | 実装に合わせて全面更新。Book に `scrapingStatus` / `updatedBy` 追加、HTML 直接入力フォールバック、再フェッチ機能、`onUpdateBook` / `onDeleteBook` / `onDeleteGroup` / `onDeleteTag` トリガー、タグ管理画面、設定画面（テーマ／読了非表示）、PWA 対応、キーボードショートカット、モノレポ構成・フィールド命名（`bookId` / `tagId` / `groupId`）、Firestore スキーマバリデーションルールを追記 | - |
 | 2026-06-15 | 1.3 | グループ共有機能（FR-SHARE-001〜004）を追加。`sharedGroups` トップレベルコレクション、共有リンク生成・閲覧・自動同期・解除機能、`onUpdateGroup` トリガー新設、既存トリガーに共有グループ同期処理を追加、公開ページ（`/shared/{sharedGroupId}`）、Firestore セキュリティルール追加 | - |
+| 2026-09-24 | 1.4 | 実態との乖離を修正。開発ツールを ESLint+Prettier → Biome に変更、Turborepo・tsup・dayjs・express-validator を追記、Functions ランタイムを Node.js 22 に明記、Firestore ルールの sharedGroups を実態（クライアント create/delete 可能）に修正、`normalizeTagLabel` の説明を Unicode NFC 正規化に修正、ファイル構成に `onUpdateGroup.ts`・`ogp.ts`・`convertDate.ts`・`array.ts`・`errorMessage.ts`・`GroupCheckboxList`・`useRecentTags` 等を追加、未実装の `api/sharedGroups/` を削除 | - |
 
 ---
 
