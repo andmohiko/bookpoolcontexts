@@ -74,13 +74,22 @@ function HomePage() {
               key={t.tagId}
               to="/"
               search={{ tag: t.label }}
-              className={`shrink-0 rounded-full border px-3 py-1 text-sm transition-colors ${
+              className={`flex shrink-0 items-center gap-1.5 rounded-full border py-1 pl-3 pr-1.5 text-sm transition-colors ${
                 tag === t.label
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-background text-muted-foreground hover:bg-accent'
               }`}
             >
               #{t.label}
+              <span
+                className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-medium ${
+                  tag === t.label
+                    ? 'bg-primary-foreground/20 text-primary-foreground'
+                    : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {t.count > 99 ? '99+' : t.count}
+              </span>
             </Link>
           ))}
         </nav>
