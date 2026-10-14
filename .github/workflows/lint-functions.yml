@@ -1,6 +1,9 @@
-name: Run @vectornote/functions lint
+name: Run @bookpoolcontexts/functions lint
 on:
   push:
+    paths:
+      - apps/functions/src/**
+  pull_request:
     paths:
       - apps/functions/src/**
 jobs:
@@ -16,12 +19,12 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 8.9.2
+          version: 10.17.1
 
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: '22'
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
@@ -32,7 +35,7 @@ jobs:
         run: pnpm functions lint:tsc
 
       - name: biome
-        run: pnpm web lint:biome
+        run: pnpm functions lint:biome
 
       - name: cspell
         run: pnpm functions lint:cspell

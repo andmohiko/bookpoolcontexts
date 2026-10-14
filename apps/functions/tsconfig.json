@@ -18,9 +18,9 @@
     },
     "resolveJsonModule": true,
     "noUnusedLocals": true,
-    "types": ["vitest/globals", "node"],
+    "types": ["node"],
   },
   "compileOnSave": true,
-  "include": ["src", "test"],
+  "include": ["src"],
   "exclude": ["node_modules", "lib"]
 }

@@ -9,6 +9,9 @@
     "test": "vitest run",
     "format": "biome format",
     "lint": "biome lint",
+    "lint:tsc": "tsc --noEmit",
+    "lint:biome": "biome lint ./src",
+    "lint:cspell": "cspell -c ../../cspell.json src/**/*",
     "check": "biome check",
     "deploy:hosting": "pnpm build && firebase deploy --only hosting"
   },
