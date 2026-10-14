@@ -426,11 +426,87 @@ FR-LIST-004 を参照。
 
 ---
 
-### 2.9 キーボードショートカット
+### 2.9 読みたい本ランキング機能
+
+未読の本同士を「どちらがより読みたいか」の 2 択で比較し、読みたい順に並べたランキングを作る機能。比較の組み合わせはソートアルゴリズムが要求する順に提示し、必要最小限の回答でソートを完了させる。
+
+ランキングはユーザーごとに 1 つ。対象は未読（`isRead === false`）の本のみ。ソートの途中状態は Firestore に保存し、別端末・別セッションからでも再開できる。
+
+#### FR-RANK-001: ランキングの作成（2 択ソート）
+
+| 項目 | 内容 |
+|------|------|
+| 概要 | 未読の本を 2 択比較で並び替え、読みたい順のランキングを作る |
+| 優先度 | 必須 |
+
+**詳細要件:**
+- ランキング画面（`/ranking`）で「ランキングを作成」を押すと、その時点の未読本（除外済みを除く）を対象にソートを開始する
+- 未読本が 2 冊未満のときは作成ボタンを無効化する
+- 本を 2 冊（表紙・タイトル・著者）並べて表示し、より読みたい方をタップで選ぶ。`←` / `→` キーでも選べる
+- 各本に「ランキングに含めない」ボタンを置き、押すとその本を除外して次の 2 択に進む（FR-RANK-003）
+- 「1 つ戻る」で直前の回答を取り消せる
+- 進捗を「回答数 / 最大比較回数」で表示する
+- すべての比較が終わるとランキングが確定し、ランキング表示に切り替わる
+- ソート中に画面を離れても状態は保持され、次に `/ranking` を開くと続きから再開する
+- 「ソートを破棄」で進行中のソートを捨てられる（確認ダイアログあり）
+- すでにランキングがある状態で「作り直す」を選んだ場合、新しいソートが完了するまで旧ランキングを保持する。中断中は旧ランキングを表示し、上部に「中断中のソートを再開」バナーを出す
+
+**比較アルゴリズム:**
+- 新規作成時は**ボトムアップ**のマージソート
+- トップダウン（再帰）にしない理由は出題順。再帰では前半の数冊を完全に並べ終えてから後半に移るため、全体の 1/4 を答え終わってもまだ見ていない本が残り、「全体像が見えないまま細部の順位付けに入る」体験になる。ボトムアップは幅優先に進むので、最初の `⌈n/2⌉` 問で全冊が 1 回ずつ登場し、そこから段階的に精度が上がる
+- ランの数が奇数のとき、余った 1 本を次の段へ素通しすると、その中の本が終盤まで出題されない（n=9 なら 9 冊目が 16 問目まで登場しない）。余りは最短のランへ畳むことで、全冊が `⌈n/2⌉` 問で登場することを保証する
+- 最悪比較回数はラン構造をたどって各マージのコスト（左の長さ + 右の長さ − 1）を積み上げて求める。n=1〜9 は全順列を網羅した実測値と一致（n=5 → 8、n=8 → 17、n=9 → 21、n=100 → 577）
+- 「同じくらい」の選択肢は設けない。必ずどちらかを選ぶ
+- 左右の表示順はアルゴリズムが返す順で固定する
+- 候補 ID の重複はエンジンの入口で除去する。重複があると自分自身との比較が発生し、2 択の左右に同じ本が並ぶ
+
+#### FR-RANK-002: ランキングの表示と更新
+
+| 項目 | 内容 |
+|------|------|
+| 概要 | 確定したランキングを表示し、未追加の本を組み込む |
+| 優先度 | 必須 |
+
+**詳細要件:**
+- ランキングは順位・表紙・タイトル・著者のリストで表示する
+- ランキング確定後に読了になった本・削除された本は表示から外す（次回更新時にランキングからも除去する）
+- ランキングに含まれていない未読本を「ランキング未追加の本」として件数付きで表示する
+- 「ランキングを更新（未追加 N 冊）」を押すと、未追加の本だけを比較対象として既存ランキングに組み込むソートを開始する。未追加が 0 冊なら無効化
+- 「作り直す」を押すと、確認ダイアログの後に現時点の未読本全体を対象にソートし直す（FR-RANK-001）
+- ソート中に新しく登録された本はそのソートに含めない。次回の「更新」で組み込む
+
+**更新時の比較アルゴリズム:**
+- 既存ランキングの順序は確定済みの比較結果として扱い、既存の本同士は再比較しない
+- 未追加の本を 1 冊ずつ既存ランキングへ二分探索で挿入する
+- 最大比較回数は累積和 `Σ_{i=1..k} ⌈log₂(n+i)⌉`（n = 既存ランキング冊数、k = 未追加冊数）。挿入ごとにリストが伸びるため `k × ⌈log₂(n+1)⌉` では実測を下回る
+
+#### FR-RANK-003: ランキングからの除外
+
+| 項目 | 内容 |
+|------|------|
+| 概要 | 特定の本をランキング対象から外す |
+| 優先度 | 必須 |
+
+**詳細要件:**
+- 2 択画面の「ランキングに含めない」で本を除外できる。除外した本はそのソートの対象から即座に外れる
+- 除外は永続的で、作り直し・更新のいずれでも対象外になる
+- ランキング画面の「除外した本」セクションから除外を解除できる。解除した本は「ランキング未追加の本」に戻る
+- 除外解除は `status === 'idle'` のときのみ可能。ソート進行中は解除ボタンを無効化する（解除するとその本に関する比較が改めて要求され、進捗が巻き戻って見えるため）
+- ランキング表示から個別の本を除外する操作、順位の手動変更は提供しない
+
+**実装上の注意（`arrayUnion` の重複排除）:**
+
+firebase-js-sdk の `arrayUnion` は `valueEquals` による深い等価比較で重複を排除するため、`{ winner, loser }` は配列内に 1 つしか入らない。このため回答の記録は冪等である一方、`onSnapshot` の到着を待って確定処理を呼ぶ設計にすると、スナップショット到着前の再回答が無視され進捗が止まる。回答と確定は 1 回の `updateDoc` にまとめる。
+
+---
+
+### 2.10 キーボードショートカット
 
 | ショートカット | 動作 |
 |---------------|------|
 | `c` | 本の登録モーダルを開く（登録モーダルが開いていないとき） |
+| `←` | ランキングのソート中、左の本を選ぶ |
+| `→` | ランキングのソート中、右の本を選ぶ |
 
 ---
 
@@ -512,11 +588,21 @@ firestore/
 │       │       ├── createdAt: Timestamp
 │       │       ├── label: string
 │       │       └── updatedAt: Timestamp
-│       └── tags/  (サブコレクション)
-│           └── {tagId}/
-│               ├── count: number
+│       ├── tags/  (サブコレクション)
+│       │   └── {tagId}/
+│       │       ├── count: number
+│       │       ├── createdAt: Timestamp
+│       │       ├── label: string           // normalizeTagLabel で正規化済み
+│       │       └── updatedAt: Timestamp
+│       └── rankings/  (サブコレクション)
+│           └── current/                    // ドキュメントIDは固定
+│               ├── status: 'idle' | 'sorting'
+│               ├── mode: 'create' | 'update' | null
+│               ├── candidateBookIds: string[]   // ソート開始時の比較対象
+│               ├── decisions: { winner: string, loser: string }[]
+│               ├── rankedBookIds: string[]      // 確定済みランキング（上位から）
+│               ├── excludedBookIds: string[]
 │               ├── createdAt: Timestamp
-│               ├── label: string           // normalizeTagLabel で正規化済み
 │               └── updatedAt: Timestamp
 ├── sharedGroups/
 │   └── {sharedGroupId}/
@@ -608,7 +694,47 @@ firestore/
 
 > ℹ️ `sharedGroups` はトップレベルコレクションとする（ユーザーのサブコレクションではない）。認証不要で読み取り可能にするため。書き込みは Cloud Functions（Firestore トリガー）および認証済みクライアントからのみ許可する。
 
-### 4.7 TypeScript 型定義
+### 4.7 rankings サブコレクション
+
+ユーザーごとに 1 ドキュメント。ドキュメントIDは固定で `current`。
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| rankingId | string | 固定値 `current`（ドキュメントID） |
+| status | `'idle' \| 'sorting'` | `sorting` = ソート進行中（中断中を含む） |
+| mode | `'create' \| 'update' \| null` | `create`: 候補全体をマージソート。`update`: 候補を `rankedBookIds` に二分挿入。`idle` のとき `null` |
+| candidateBookIds | string[] | ソート開始時のスナップショット。`create` では未読本全体、`update` では未追加の本のみ |
+| decisions | `{ winner: string, loser: string }[]` | 比較の回答ログ。ソート状態はこのログから再計算する |
+| rankedBookIds | string[] | 確定済みランキング（上位から）。`create` のソート中は旧ランキングを保持し、完了時に置き換える |
+| excludedBookIds | string[] | 除外リスト。永続的 |
+| createdAt | Timestamp | 作成日時 |
+| updatedAt | Timestamp | 更新日時 |
+
+**「回答ログ + 再計算」方式を採る理由:**
+- Firestore は配列の中に配列を保存できないため、マージソートのラン（部分列）の状態をそのまま保存すると構造が煩雑になる
+- 除外・削除・読了で候補が減っても、残った本同士の回答ログはそのまま有効。状態の整合性を保つ処理が不要
+- ソート処理が純粋関数になり、Vitest で「同じ入力なら同じ 2 択が出る」ことを検証できる
+
+**制約:**
+- 1 回答につき Firestore 書き込み 1 回
+- ドキュメント上限 1MB から、実用上の上限は未読 1000 冊前後（decisions 約 1 万件）
+
+**状態遷移:**
+
+```
+[ドキュメントなし]
+   │ ランキングを作成
+   ▼
+[sorting / create] ──回答を繰り返す──▶ 完了 ──▶ [idle] rankedBookIds = 新ランキング
+   │ ソートを破棄
+   ▼
+[idle]（rankedBookIds は変更しない）
+
+[idle] ──ランキングを更新──▶ [sorting / update] ──完了──▶ [idle] rankedBookIds = 挿入後の順序
+[idle] ──作り直す────────▶ [sorting / create]（rankedBookIds は完了まで保持）
+```
+
+### 4.8 TypeScript 型定義
 
 共通型は `packages/common/src/entities/` に配置し、`@bookpoolcontexts/common` として web と functions の両方から参照する。Entity 型と DTO 型を分離し、タイムスタンプは Entity 側では `Date`、DTO 側では `FieldValue` で表現する（Firestore 実装ルールに準拠）。
 
@@ -707,6 +833,53 @@ export type UpdateSharedGroupDtoFromAdmin = {
 }
 ```
 
+**Ranking エンティティ（`packages/common/src/entities/Ranking.ts`）:**
+
+```typescript
+import type { FieldValue } from 'firebase/firestore'
+import type { BookId } from './Book'
+
+export const rankingCollection = 'rankings' as const
+export const currentRankingId = 'current' as const
+export type RankingId = string
+
+export type RankingStatus = 'idle' | 'sorting'
+export type RankingMode = 'create' | 'update'
+
+export type RankingDecision = {
+  winner: BookId
+  loser: BookId
+}
+
+export type Ranking = {
+  rankingId: RankingId
+  status: RankingStatus
+  mode: RankingMode | null
+  candidateBookIds: Array<BookId>
+  decisions: Array<RankingDecision>
+  rankedBookIds: Array<BookId>
+  excludedBookIds: Array<BookId>
+  createdAt: Date
+  updatedAt: Date
+}
+
+export type CreateRankingDto = Omit<Ranking, 'rankingId' | 'createdAt' | 'updatedAt'> & {
+  createdAt: FieldValue
+  updatedAt: FieldValue
+}
+
+// decisions / excludedBookIds は arrayUnion / arrayRemove を許可する
+export type UpdateRankingDto = {
+  status?: Ranking['status']
+  mode?: Ranking['mode']
+  candidateBookIds?: Ranking['candidateBookIds']
+  decisions?: Ranking['decisions'] | FieldValue
+  rankedBookIds?: Ranking['rankedBookIds']
+  excludedBookIds?: Ranking['excludedBookIds'] | FieldValue
+  updatedAt: FieldValue
+}
+```
+
 ---
 
 ## 5. 画面設計
@@ -722,6 +895,7 @@ export type UpdateSharedGroupDtoFromAdmin = {
 | SCR-005 | 設定画面 | `/settings` | 必要 | テーマ、読了非表示、ログアウト |
 | SCR-006 | About 画面 | `/about` | 必要 | アプリの説明 |
 | SCR-007 | 共有グループ閲覧画面 | `/shared/$sharedGroupId` | 不要 | 共有リンクから閲覧するパブリックページ |
+| SCR-008 | 読みたい本ランキング | `/ranking` | 必要 | 未読本の 2 択ソートとランキング表示 |
 
 > 本の登録／編集／削除は画面遷移ではなくホーム画面上のモーダル（`BookRegistrationModal` / `BookEditModal` / `DeleteBookAlertDialog`）で行う。そのため `/new` や `/book/$bookId`、`/group/$groupId` といった固有の画面ルートは持たない。
 
@@ -739,6 +913,11 @@ export type UpdateSharedGroupDtoFromAdmin = {
                                          [削除確認ダイアログ]
 
   [サイドナビ] ──▶ [グループ管理] / [タグ管理] / [設定] / [About]
+                └─▶ [読みたい本ランキング]
+                        │
+                        ├─(未作成)──▶ [作成の案内]
+                        ├─(ソート中)─▶ [2択比較画面]
+                        └─(確定済み)─▶ [ランキングリスト]
 ```
 
 ### 5.3 SCR-001: ログイン画面
@@ -918,6 +1097,83 @@ export type UpdateSharedGroupDtoFromAdmin = {
 - SharedGroupHeader（ロゴ + CTA リンク）
 - SharedBookList / SharedBookCard（表紙・タイトル・著者・タグのみ）
 
+### 5.10 SCR-008: 読みたい本ランキング画面
+
+`useRankingProgress` の結果で以下の 3 状態を分岐表示する。
+
+**状態 A: ランキング未作成**（ドキュメントなし、または確定済みランキングが空）
+
+```
+┌─────────────────────────────────────────────┐
+│  読みたい本ランキング                        │
+├─────────────────────────────────────────────┤
+│                   🏆                        │
+│  未読の本を 2 択で比べて、読みたい順に        │
+│  並べましょう。                              │
+│  対象: 未読 12 冊 / 最大 33 回の比較          │
+│                                             │
+│           [ランキングを作成]                 │
+├─────────────────────────────────────────────┤
+│  ▸ 除外した本 (2)                           │
+└─────────────────────────────────────────────┘
+```
+
+**状態 B: 2 択比較画面**（`status === 'sorting'` かつ次の比較がある）
+
+```
+┌─────────────────────────────────────────────┐
+│  どちらをより読みたい？        [あとで続ける] │
+│  ████████░░░░░░░░  12 / 最大 33             │
+├──────────────────────┬──────────────────────┤
+│  ┌────────────────┐  │  ┌────────────────┐  │
+│  │      📕        │  │  │      📘        │  │
+│  └────────────────┘  │  └────────────────┘  │
+│  タイトルA            │  タイトルB            │
+│  著者A                │  著者B                │
+│  [ランキングに含めない]│  [ランキングに含めない]│
+├──────────────────────┴──────────────────────┤
+│  [← 1つ戻る]                  [ソートを破棄] │
+└─────────────────────────────────────────────┘
+```
+
+- カード全体がボタン。`←` / `→` キーでも選択できる
+- 「あとで続ける」はホームに戻るだけ（状態は保存済み）
+- 「ソートを破棄」は確認ダイアログを表示する
+- 回答・除外・1つ戻るの処理中はカードを無効化し、連打を防ぐ
+- モバイルは縦 2 段、`sm:` 以上で横並び
+
+**状態 C: ランキング表示**（確定済みランキングがある）
+
+```
+┌─────────────────────────────────────────────┐
+│  読みたい本ランキング                        │
+│  [ランキングを更新（未追加 3冊）] [作り直す]  │
+├─────────────────────────────────────────────┤
+│  ⚠ 中断中のソートがあります（12 / 最大 33 問）│
+│                        [中断中のソートを再開] │
+├─────────────────────────────────────────────┤
+│  1  📕 タイトル / 著者                       │
+│  2  📘 タイトル / 著者                       │
+│  3  📗 タイトル / 著者                       │
+├─────────────────────────────────────────────┤
+│  ▸ ランキング未追加の本 (3)                  │
+│  ▸ 除外した本 (2)              [除外を解除]  │
+└─────────────────────────────────────────────┘
+```
+
+- `create` モードのソートを中断している場合は、リストの上に「中断中のソートを再開」バナーを表示する。再開を押すと状態 B に切り替わる
+- `update` モードは旧ランキングを置き換える前提なので、画面を開くと即座に状態 B に入る
+- 読了・削除された本はリストに出さない
+- 「作り直す」は確認ダイアログを表示する
+- 折りたたみセクションは `details` / `summary` で実装する
+
+**コンポーネント:**
+- `RankingEmptyState`
+- `ComparisonView` / `ComparisonCard` / `SortProgressBar`
+- `RankingList` / `RankingListItem`
+- `UnrankedBooksSection` / `ExcludedBooksSection`
+- `RebuildRankingAlertDialog` / `DiscardSortAlertDialog`（いずれも `Dialog` ベース）
+
 ---
 
 ## 6. API設計
@@ -1059,6 +1315,23 @@ export type UpdateSharedGroupDtoFromAdmin = {
 | 共有グループ解除 | `useDeleteSharedGroupMutation` / `deleteSharedGroupOperation` | Firestore から直接削除 |
 | 共有グループ取得 | `useSharedGroup` / `getSharedGroupOperation` | Firestore から直接読み取り（認証不要） |
 | 共有状態の購読 | `useSharedGroups` / `subscribeSharedGroupsOperation` | 自分が作成した共有グループ一覧をリアルタイム購読 |
+| ランキング購読 | `useRanking` / `subscribeRankingOperation` | `users/{uid}/rankings/current` を購読。未作成なら `null` |
+| 未読本の全件購読 | `useUnreadBooks` / `subscribeUnreadBooksOperation` | `where('isRead','==',false)` のみ。`limit` なしのためランキング画面でのみ使用 |
+| ランキングの派生値計算 | `useRankingProgress` | 削除・読了・除外を除いた候補でソート進捗を再計算。状態を持たない |
+| ソート開始 | `useStartRankingMutation` | `startCreate` / `startUpdate`。未作成なら `setDoc`、既存なら `updateDoc` |
+| 2択の回答 | `useAnswerComparisonMutation` | 次の進捗をローカル計算し、完了なら回答と確定を 1 回の `updateDoc` にまとめる |
+| 1つ戻る | `useUndoComparisonMutation` | `decisions` の末尾を `arrayRemove` |
+| 除外／除外解除 | `useExcludeBookMutation` / `useUnexcludeBookMutation` | 解除は `status === 'idle'` のときのみ |
+| ソート破棄 | `useDiscardSortMutation` | `rankedBookIds` は保持する |
+
+**ソートエンジン（`features/ranking/utils/sortEngine.ts`）:**
+
+React / Firestore に依存しない純粋関数として実装し、Vitest でテストする（`pnpm --filter web test`）。
+
+| 関数 | 説明 |
+|------|------|
+| `computeSortProgress(input)` | 回答ログから次の 2 択または確定順序を再計算する。決定的なので同じ入力なら常に同じ 2 択を返す |
+| `estimateMaxComparisons(mode, candidateCount, baseCount)` | 最悪比較回数。`create` はマージソートの式、`update` は二分挿入の累積和 |
 
 ---
 
@@ -1126,6 +1399,7 @@ bookpoolcontexts/
 │   │       │       ├── groups.tsx         # /groups
 │   │       │       ├── tags.tsx           # /tags
 │   │       │       ├── settings.tsx       # /settings
+│   │       │       ├── ranking.tsx        # /ranking
 │   │       │       └── about.tsx          # /about
 │   │       ├── features/
 │   │       │   ├── books/
@@ -1134,12 +1408,16 @@ bookpoolcontexts/
 │   │       │   │   ├── schemas/            # bookRegistrationSchema / bookEditSchema (Zod)
 │   │       │   │   └── utils/              # parseAmazonHtml
 │   │       │   ├── groups/                  # GroupList, GroupCheckboxList, GroupSelectDropdown, CreateGroupDialog, EditGroupDialog, DeleteGroupAlertDialog, ShareGroupDialog, useGroups
+│   │       │   ├── ranking/
+│   │       │   │   ├── components/        # ComparisonView, ComparisonCard, SortProgressBar, RankingList, RankingListItem, UnrankedBooksSection, ExcludedBooksSection, RankingEmptyState, RebuildRankingAlertDialog, DiscardSortAlertDialog
+│   │       │   │   ├── hooks/              # useRanking, useUnreadBooks, useRankingProgress, useStartRankingMutation, useAnswerComparisonMutation, useUndoComparisonMutation, useExcludeBookMutation, useUnexcludeBookMutation, useDiscardSortMutation
+│   │       │   │   └── utils/              # sortEngine（マージソート / 二分挿入の純粋関数）+ sortEngine.test.ts
 │   │       │   ├── shared/                  # SharedBookList, SharedBookCard, SharedGroupHeader, useSharedGroup
 │   │       │   └── tags/                    # TagList, TagSuggestionDropdown, EditTagDialog, DeleteTagAlertDialog, useTags, useRecentTags
 │   │       ├── components/                  # 共通コンポーネント（SideNav, Header, Footer, ThemeToggle, ui/）
 │   │       ├── hooks/                       # useHideReadBooks, useThemeMode, useKeyboardShortcut, useDisclosure, usePWAInstall, useServiceWorker, use-mobile など
 │   │       ├── infrastructure/
-│   │       │   └── firestore/               # books.ts, groups.ts, tags.ts, users.ts（Operations 層）
+│   │       │   └── firestore/               # books.ts, groups.ts, rankings.ts, tags.ts, users.ts（Operations 層）
 │   │       ├── providers/
 │   │       │   └── FirebaseAuthProvider.tsx
 │   │       ├── lib/
@@ -1181,6 +1459,7 @@ bookpoolcontexts/
 │           │   ├── Auth.ts
 │           │   ├── Book.ts
 │           │   ├── Group.ts
+│           │   ├── Ranking.ts
 │           │   ├── SharedGroup.ts
 │           │   ├── Tag.ts
 │           │   └── User.ts
@@ -1253,6 +1532,12 @@ service cloud.firestore {
         allow delete: if isSignedIn() && isUser(userId);
         // create は Cloud Functions（Admin SDK）のみ許可
       }
+
+      match /rankings/{rankingId} {
+        allow read: if isSignedIn() && isUser(userId);
+        allow create, update: if isSignedIn() && isUser(userId) && isValidRankingSchema(requestData());
+        allow delete: if isSignedIn() && isUser(userId);
+      }
     }
 
     match /sharedGroups/{sharedGroupId} {
@@ -1264,6 +1549,8 @@ service cloud.firestore {
   }
 }
 ```
+
+> ℹ️ `isValid*Schema` はいずれも `size()` でフィールド数を固定し、過不足のある書き込みを拒否する。`update` 操作では `request.resource.data` にマージ後のドキュメント全体が入る（[公式ドキュメント](https://firebase.google.com/docs/firestore/security/rules-conditions)）ため、部分更新でも `size()` の検証が成立する。
 
 ### 8.2 入力値検証
 
@@ -1382,6 +1669,7 @@ VITE_FIREBASE_APP_ID=xxx
 | 2026-04-11 | 1.2 | 実装に合わせて全面更新。Book に `scrapingStatus` / `updatedBy` 追加、HTML 直接入力フォールバック、再フェッチ機能、`onUpdateBook` / `onDeleteBook` / `onDeleteGroup` / `onDeleteTag` トリガー、タグ管理画面、設定画面（テーマ／読了非表示）、PWA 対応、キーボードショートカット、モノレポ構成・フィールド命名（`bookId` / `tagId` / `groupId`）、Firestore スキーマバリデーションルールを追記 | - |
 | 2026-06-15 | 1.3 | グループ共有機能（FR-SHARE-001〜004）を追加。`sharedGroups` トップレベルコレクション、共有リンク生成・閲覧・自動同期・解除機能、`onUpdateGroup` トリガー新設、既存トリガーに共有グループ同期処理を追加、公開ページ（`/shared/{sharedGroupId}`）、Firestore セキュリティルール追加 | - |
 | 2026-09-24 | 1.4 | 実態との乖離を修正。開発ツールを ESLint+Prettier → Biome に変更、Turborepo・tsup・dayjs・express-validator を追記、Functions ランタイムを Node.js 22 に明記、Firestore ルールの sharedGroups を実態（クライアント create/delete 可能）に修正、`normalizeTagLabel` の説明を Unicode NFC 正規化に修正、ファイル構成に `onUpdateGroup.ts`・`ogp.ts`・`convertDate.ts`・`array.ts`・`errorMessage.ts`・`GroupCheckboxList`・`useRecentTags` 等を追加、未実装の `api/sharedGroups/` を削除 | - |
+| 2026-10-14 | 1.5 | 読みたい本ランキング機能（FR-RANK-001〜003）を追加。`rankings` サブコレクション（ドキュメントID固定 `current`）、回答ログ + 再計算方式のソートエンジン（create はマージソート、update は二分挿入）、SCR-008 ランキング画面、`features/ranking/`（コンポーネント 10 / フック 9 / sortEngine + Vitest テスト 33 件）、`subscribeUnreadBooksOperation`、Firestore セキュリティルール追加。`arrayUnion` の深い重複排除に対応し回答と確定を 1 回の `updateDoc` にまとめる設計、update の最大比較回数を累積和 `Σ⌈log₂(n+i)⌉` に修正、除外解除は `idle` 時のみ許可 | - |
 
 ---
 
