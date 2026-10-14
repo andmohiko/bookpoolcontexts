@@ -66,6 +66,21 @@ service cloud.firestore {
         && 'updatedAt' in requestData && requestData.updatedAt is timestamp;
     }
 
+    // Ranking のスキーマバリデーション
+    // update では request.resource.data にマージ後のドキュメント全体が入るため
+    // 部分更新でも size() == 8 が成立する
+    function isValidRankingSchema(requestData) {
+      return requestData.size() == 8
+        && 'status' in requestData && requestData.status is string
+        && 'mode' in requestData && (requestData.mode is string || requestData.mode == null)
+        && 'candidateBookIds' in requestData && requestData.candidateBookIds is list
+        && 'decisions' in requestData && requestData.decisions is list
+        && 'rankedBookIds' in requestData && requestData.rankedBookIds is list
+        && 'excludedBookIds' in requestData && requestData.excludedBookIds is list
+        && 'createdAt' in requestData && requestData.createdAt is timestamp
+        && 'updatedAt' in requestData && requestData.updatedAt is timestamp;
+    }
+
     // SharedGroup のスキーマバリデーション
     function isValidSharedGroupSchema(requestData) {
       return requestData.size() == 7
@@ -109,6 +124,13 @@ service cloud.firestore {
         allow update: if isSignedIn() && isUser(userId) && isValidTagSchema(requestData());
         allow delete: if isSignedIn() && isUser(userId);
         // create は Cloud Functions のみ許可（Admin SDK が Rules をバイパス）
+      }
+
+      match /rankings/{rankingId} {
+        allow read: if isSignedIn() && isUser(userId);
+        allow create: if isSignedIn() && isUser(userId) && isValidRankingSchema(requestData());
+        allow update: if isSignedIn() && isUser(userId) && isValidRankingSchema(requestData());
+        allow delete: if isSignedIn() && isUser(userId);
       }
     }
   }
