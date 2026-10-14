@@ -109,6 +109,33 @@ export const subscribeBooksOperation = (
   })
 }
 
+/**
+ * 未読の本を全件リアルタイム購読する（ランキング機能用）。
+ *
+ * orderBy を付けず where のみにすることで複合インデックスを不要にしている。
+ * 並び順は呼び出し側で createdAt 昇順に整える。
+ *
+ * NOTE: limit を付けない全件購読のためドキュメント読み取り数が多い。
+ * ランキング画面配下でのみ購読し、常時マウントされる箇所からは呼ばないこと。
+ */
+export const subscribeUnreadBooksOperation = (
+  uid: Uid,
+  setter: (books: Array<Book>) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe => {
+  const q = query(booksRef(uid), where('isRead', '==', false))
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const books = snapshot.docs.map(
+        (d) => ({ bookId: d.id, ...convertDate(d.data(), dateColumns) }) as Book,
+      )
+      setter(books)
+    },
+    onError,
+  )
+}
+
 /** グループに属する本の一覧を取得する（ページネーション対応） */
 export const fetchBooksByGroupOperation = async (
   uid: Uid,

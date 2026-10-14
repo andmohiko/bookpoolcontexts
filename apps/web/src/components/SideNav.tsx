@@ -1,5 +1,11 @@
-import { Link, useSearch } from '@tanstack/react-router'
-import { DownloadIcon, FolderOpen, Settings2, TagIcon } from 'lucide-react'
+import { Link, useLocation, useSearch } from '@tanstack/react-router'
+import {
+  DownloadIcon,
+  FolderOpen,
+  Settings2,
+  TagIcon,
+  Trophy,
+} from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -25,8 +31,11 @@ export const SideNav = () => {
     tag?: string
     group?: string
   }
+  const location = useLocation()
   const selectedTag = search.tag ?? null
   const selectedGroup = search.group ?? null
+  const isHome = location.pathname === '/'
+  const isRanking = location.pathname === '/ranking'
   const { canInstall, promptInstall } = usePWAInstall()
 
   return (
@@ -38,13 +47,28 @@ export const SideNav = () => {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={selectedTag === null && selectedGroup === null}
+                  isActive={
+                    isHome && selectedTag === null && selectedGroup === null
+                  }
                   tooltip="すべて"
                   className="data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90 data-[active=true]:hover:text-primary-foreground"
                 >
                   <Link to="/" search={{}}>
                     <TagIcon />
                     <span>すべて</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isRanking}
+                  tooltip="読みたい本ランキング"
+                  className="data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90 data-[active=true]:hover:text-primary-foreground"
+                >
+                  <Link to="/ranking">
+                    <Trophy />
+                    <span>読みたい本ランキング</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -66,7 +90,7 @@ export const SideNav = () => {
                     <SidebarMenuItem key={group.groupId}>
                       <SidebarMenuButton
                         asChild
-                        isActive={selectedGroup === group.label}
+                        isActive={isHome && selectedGroup === group.label}
                         tooltip={group.label}
                         className="data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90 data-[active=true]:hover:text-primary-foreground"
                       >
@@ -77,7 +101,7 @@ export const SideNav = () => {
                       </SidebarMenuButton>
                       <SidebarMenuBadge
                         className={
-                          selectedGroup === group.label
+                          isHome && selectedGroup === group.label
                             ? '!text-primary-foreground'
                             : ''
                         }
@@ -112,7 +136,7 @@ export const SideNav = () => {
                     <SidebarMenuItem key={tag.tagId}>
                       <SidebarMenuButton
                         asChild
-                        isActive={selectedTag === tag.label}
+                        isActive={isHome && selectedTag === tag.label}
                         tooltip={tag.label}
                         className="data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90 data-[active=true]:hover:text-primary-foreground"
                       >
@@ -123,7 +147,7 @@ export const SideNav = () => {
                       </SidebarMenuButton>
                       <SidebarMenuBadge
                         className={
-                          selectedTag === tag.label
+                          isHome && selectedTag === tag.label
                             ? '!text-primary-foreground'
                             : ''
                         }
