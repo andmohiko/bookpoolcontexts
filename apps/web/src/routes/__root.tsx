@@ -130,6 +130,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja" className="dark" style={{ colorScheme: 'dark' }} suppressHydrationWarning>
       <head>
+        {/* ハイドレーション前にテーマを適用してちらつきを防ぐ。
+            THEME_INIT_SCRIPT は静的なリテラルでユーザー入力を含まない */}
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: テーマ初期化のための静的スクリプト */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <HeadContent />
       </head>

@@ -17,10 +17,6 @@ import { serverTimestamp } from '@/lib/firebase'
 import { useFirebaseAuthContext } from '@/providers/FirebaseAuthProvider'
 import { errorMessage } from '@/utils/errorMessage'
 
-export const Route = createFileRoute('/_authed/settings')({
-  component: SettingsPage,
-})
-
 const themeOptions: Array<{
   value: ThemeMode
   label: string
@@ -107,8 +103,12 @@ const SettingsPage = () => {
 
       <section className="mb-8">
         <h2 className="mb-4 text-lg font-semibold">本の表示</h2>
-        <label className="flex items-center gap-2 text-sm">
+        <label
+          htmlFor="hide-read-books"
+          className="flex items-center gap-2 text-sm"
+        >
           <Checkbox
+            id="hide-read-books"
             checked={hideReadBooks}
             onCheckedChange={(v) => setHideReadBooks(v === true)}
           />
@@ -125,3 +125,7 @@ const SettingsPage = () => {
     </main>
   )
 }
+
+export const Route = createFileRoute('/_authed/settings')({
+  component: SettingsPage,
+})

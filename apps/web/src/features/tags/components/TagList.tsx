@@ -28,8 +28,11 @@ export const TagList = () => {
   if (isLoading) {
     return (
       <div className="space-y-2">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={`skeleton-${i}`} className="h-16 w-full rounded-lg" />
+        {['1st', '2nd', '3rd'].map((position) => (
+          <Skeleton
+            key={`skeleton-${position}`}
+            className="h-16 w-full rounded-lg"
+          />
         ))}
       </div>
     )

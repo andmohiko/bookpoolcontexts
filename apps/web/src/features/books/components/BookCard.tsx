@@ -36,7 +36,9 @@ export const BookCard = ({ book, onClick }: BookCardProps) => {
     }
   }
 
+  // カード内に「再取得」ボタンを置くため、button 要素だとネストが不正になる
   return (
+    // biome-ignore lint/a11y/useSemanticElements: ボタンを内包するため div + role で実装している
     <div
       role="button"
       tabIndex={0}

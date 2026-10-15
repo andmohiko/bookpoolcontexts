@@ -11,7 +11,11 @@
       "packages/*/src/**/*",
       "!**/node_modules/**",
       "!**/dist/**",
-      "!**/dev-dist/**"
+      "!**/dev-dist/**",
+      // TanStack Router の自動生成ファイル
+      "!**/src/routeTree.gen.ts",
+      // Tailwind のディレクティブを Biome の CSS パーサーが解釈できない
+      "!**/src/styles.css"
     ]
   },
   "formatter": {

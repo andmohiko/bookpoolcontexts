@@ -19,9 +19,9 @@ function SharedGroupPage() {
         <SharedHeader />
         <Skeleton className="mb-6 h-8 w-48" />
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
-          {Array.from({ length: 6 }).map((_, i) => (
+          {['1st', '2nd', '3rd', '4th', '5th', '6th'].map((position) => (
             <Skeleton
-              key={`skeleton-${i}`}
+              key={`skeleton-${position}`}
               className="aspect-[4/5] w-full rounded-lg"
             />
           ))}
@@ -58,8 +58,10 @@ function SharedGroupPage() {
         </p>
       ) : (
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-          {sharedGroup.books.map((book, index) => (
-            <SharedBookCard key={`${book.amazonUrl}-${index}`} book={book} />
+          {/* SharedBook に ID はないため amazonUrl をキーにする。
+              スナップショットの読み取り専用表示で並べ替えも削除もしない */}
+          {sharedGroup.books.map((book) => (
+            <SharedBookCard key={book.amazonUrl} book={book} />
           ))}
         </div>
       )}

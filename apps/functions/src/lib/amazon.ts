@@ -15,13 +15,27 @@ const getLocalChromePath = (): string => {
   return '/usr/bin/google-chrome'
 }
 
+/**
+ * スクレイピング時のビューポート。
+ * @sparticuz/chromium v143 で `defaultViewport` が公開 API から外れたため、
+ * Puppeteer 側のオプションとして明示的に指定する。
+ */
+const DEFAULT_VIEWPORT = {
+  deviceScaleFactor: 1,
+  hasTouch: false,
+  height: 1080,
+  isLandscape: true,
+  isMobile: false,
+  width: 1920,
+} as const
+
 /** Puppeteerブラウザを起動する */
 const launchBrowser = async (): Promise<ReturnType<typeof puppeteer.launch>> => {
   return puppeteer.launch({
     args: isLocal
       ? ['--no-sandbox', '--disable-setuid-sandbox']
       : chromium.args,
-    defaultViewport: chromium.defaultViewport,
+    defaultViewport: DEFAULT_VIEWPORT,
     executablePath: isLocal
       ? getLocalChromePath()
       : await chromium.executablePath(),

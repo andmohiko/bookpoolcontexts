@@ -16,8 +16,8 @@ export const GroupCheckboxList = ({
   if (isLoading) {
     return (
       <div className="space-y-2">
-        {Array.from({ length: 2 }).map((_, i) => (
-          <Skeleton key={`skeleton-${i}`} className="h-6 w-32" />
+        {['1st', '2nd'].map((position) => (
+          <Skeleton key={`skeleton-${position}`} className="h-6 w-32" />
         ))}
       </div>
     )
@@ -42,9 +42,11 @@ export const GroupCheckboxList = ({
       {groups.map((group) => (
         <label
           key={group.groupId}
+          htmlFor={`group-checkbox-${group.groupId}`}
           className="flex items-center gap-2 text-sm"
         >
           <Checkbox
+            id={`group-checkbox-${group.groupId}`}
             checked={selectedGroupIds.includes(group.groupId)}
             onCheckedChange={() => toggleGroup(group.groupId)}
           />

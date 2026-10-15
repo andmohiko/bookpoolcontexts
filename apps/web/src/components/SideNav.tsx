@@ -81,8 +81,8 @@ export const SideNav = () => {
           <SidebarGroupContent>
             <SidebarMenu className="gap-2">
               {isLoadingGroups
-                ? Array.from({ length: 3 }).map((_, i) => (
-                    <SidebarMenuItem key={i}>
+                ? ['1st', '2nd', '3rd'].map((position) => (
+                    <SidebarMenuItem key={`group-skeleton-${position}`}>
                       <SidebarMenuSkeleton />
                     </SidebarMenuItem>
                   ))
@@ -127,8 +127,8 @@ export const SideNav = () => {
           <SidebarGroupContent>
             <SidebarMenu className="gap-2">
               {isLoadingTags
-                ? Array.from({ length: 4 }).map((_, i) => (
-                    <SidebarMenuItem key={i}>
+                ? ['1st', '2nd', '3rd', '4th'].map((position) => (
+                    <SidebarMenuItem key={`tag-skeleton-${position}`}>
                       <SidebarMenuSkeleton />
                     </SidebarMenuItem>
                   ))

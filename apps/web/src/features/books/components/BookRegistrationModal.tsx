@@ -218,9 +218,11 @@ export const BookRegistrationModal = ({
                 {PURCHASED_BY_OPTIONS.map((option) => (
                   <label
                     key={option}
+                    htmlFor={`register-purchased-by-${option}`}
                     className="flex items-center gap-2 text-sm"
                   >
                     <Checkbox
+                      id={`register-purchased-by-${option}`}
                       checked={purchasedBy.includes(option)}
                       onCheckedChange={() => togglePurchasedBy(option)}
                     />
@@ -250,8 +252,12 @@ export const BookRegistrationModal = ({
 
             <div className="space-y-2">
               <Label>読了状態</Label>
-              <label className="flex items-center gap-2 text-sm">
+              <label
+                htmlFor="register-is-read"
+                className="flex items-center gap-2 text-sm"
+              >
                 <Checkbox
+                  id="register-is-read"
                   checked={isRead}
                   onCheckedChange={(v) => setValue('isRead', v === true)}
                 />
