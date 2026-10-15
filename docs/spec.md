@@ -469,7 +469,7 @@ FR-LIST-004 を参照。
 
 **詳細要件:**
 - ランキングは順位・表紙・タイトル・著者のリストで表示する
-- ランキング確定後に読了になった本・削除された本は表示から外す（次回更新時にランキングからも除去する）
+- ランキング確定後に読了になった本・削除された本は表示から外す。あわせて Cloud Functions のトリガー（`onUpdateBook` / `onDeleteBook`）が `rankings/current` の各配列からも ID を取り除く
 - ランキングに含まれていない未読本を「ランキング未追加の本」として件数付きで表示する
 - 「ランキングを更新（未追加 N 冊）」を押すと、未追加の本だけを比較対象として既存ランキングに組み込むソートを開始する。未追加が 0 冊なら無効化
 - 「作り直す」を押すと、確認ダイアログの後に現時点の未読本全体を対象にソートし直す（FR-RANK-001）
@@ -715,6 +715,12 @@ firestore/
 - 除外・削除・読了で候補が減っても、残った本同士の回答ログはそのまま有効。状態の整合性を保つ処理が不要
 - ソート処理が純粋関数になり、Vitest で「同じ入力なら同じ 2 択が出る」ことを検証できる
 
+**読了・削除時の同期:**
+
+本を読了にしたとき（`onUpdateBook` で `isRead` が `true` に変化）と削除したとき（`onDeleteBook`）、Cloud Functions が `rankedBookIds` / `candidateBookIds` / `excludedBookIds` から対象の ID を `FieldValue.arrayRemove` で取り除く。`arrayRemove` は残りの要素の順序を保つため、ランキングの順位は崩れない。ランキングが未作成のユーザーでは何もしない。
+
+クライアントは元々これらの配列を「現在も未読として存在する本」に絞り込んでから使っているため、同期の有無で表示やソートの挙動は変わらない。データ側に使われない ID が蓄積するのを防ぐための処理。
+
 **制約:**
 - 1 回答につき Firestore 書き込み 1 回
 - ドキュメント上限 1MB から、実用上の上限は未読 1000 冊前後（decisions 約 1 万件）
@@ -877,6 +883,14 @@ export type UpdateRankingDto = {
   rankedBookIds?: Ranking['rankedBookIds']
   excludedBookIds?: Ranking['excludedBookIds'] | FieldValue
   updatedAt: FieldValue
+}
+
+/** firebase-admin を使用した更新用DTO（読了・削除時の同期で使用） */
+export type UpdateRankingDtoFromAdmin = {
+  candidateBookIds?: Ranking['candidateBookIds'] | AdminFieldValue
+  rankedBookIds?: Ranking['rankedBookIds'] | AdminFieldValue
+  excludedBookIds?: Ranking['excludedBookIds'] | AdminFieldValue
+  updatedAt: AdminFieldValue
 }
 ```
 
@@ -1229,6 +1243,7 @@ export type UpdateRankingDto = {
 3. `groups` の差分を算出し、追加されたラベルの `count` をインクリメント、削除されたラベルの `count` をデクリメント
 4. `tags` の差分を算出し、追加タグは count +1（未知のタグは新規作成）、削除タグは count -1（count<=1 ならドキュメント削除）
 5. 本の `groups`（変更前・変更後いずれか）に含まれる label に紐づく `sharedGroups` ドキュメントが存在する場合、`books` 配列を最新状態に再構築する
+6. `isRead` が `true` に変化した場合、`rankings/current` の `rankedBookIds` / `candidateBookIds` / `excludedBookIds` から該当 ID を取り除く
 
 #### onDeleteBook
 
@@ -1242,6 +1257,7 @@ export type UpdateRankingDto = {
 - 削除された Book の `groups` / `tags` を取り出し、それぞれの count を -1 する
 - count<=1 のタグはドキュメント自体を削除する
 - 削除された本の `groups` に含まれる label に紐づく `sharedGroups` ドキュメントが存在する場合、`books` 配列を最新状態に再構築する
+- `rankings/current` の `rankedBookIds` / `candidateBookIds` / `excludedBookIds` から該当 ID を取り除く
 
 #### onUpdateGroup
 
@@ -1442,7 +1458,7 @@ bookpoolcontexts/
 │           ├── api/
 │           │   └── health/test.ts
 │           ├── infrastructure/
-│           │   └── firestore/               # books, groups, tags, sharedGroups の Admin SDK Operations
+│           │   └── firestore/               # books, groups, rankings, tags, sharedGroups の Admin SDK Operations
 │           ├── lib/
 │           │   ├── amazon.ts                # Amazon スクレイピング
 │           │   └── firebase.ts
@@ -1670,6 +1686,7 @@ VITE_FIREBASE_APP_ID=xxx
 | 2026-06-15 | 1.3 | グループ共有機能（FR-SHARE-001〜004）を追加。`sharedGroups` トップレベルコレクション、共有リンク生成・閲覧・自動同期・解除機能、`onUpdateGroup` トリガー新設、既存トリガーに共有グループ同期処理を追加、公開ページ（`/shared/{sharedGroupId}`）、Firestore セキュリティルール追加 | - |
 | 2026-09-24 | 1.4 | 実態との乖離を修正。開発ツールを ESLint+Prettier → Biome に変更、Turborepo・tsup・dayjs・express-validator を追記、Functions ランタイムを Node.js 22 に明記、Firestore ルールの sharedGroups を実態（クライアント create/delete 可能）に修正、`normalizeTagLabel` の説明を Unicode NFC 正規化に修正、ファイル構成に `onUpdateGroup.ts`・`ogp.ts`・`convertDate.ts`・`array.ts`・`errorMessage.ts`・`GroupCheckboxList`・`useRecentTags` 等を追加、未実装の `api/sharedGroups/` を削除 | - |
 | 2026-10-14 | 1.5 | 読みたい本ランキング機能（FR-RANK-001〜003）を追加。`rankings` サブコレクション（ドキュメントID固定 `current`）、回答ログ + 再計算方式のソートエンジン（create はマージソート、update は二分挿入）、SCR-008 ランキング画面、`features/ranking/`（コンポーネント 10 / フック 9 / sortEngine + Vitest テスト 33 件）、`subscribeUnreadBooksOperation`、Firestore セキュリティルール追加。`arrayUnion` の深い重複排除に対応し回答と確定を 1 回の `updateDoc` にまとめる設計、update の最大比較回数を累積和 `Σ⌈log₂(n+i)⌉` に修正、除外解除は `idle` 時のみ許可 | - |
+| 2026-10-16 | 1.6 | 読了・削除した本をランキングのデータからも取り除くようにした（Issue #3）。`onUpdateBook`（`isRead` が `true` に変化）と `onDeleteBook` に `rankings/current` の同期処理を追加し、`UpdateRankingDtoFromAdmin` と `apps/functions` 側の rankings Operations を新設。`FieldValue.arrayRemove` は残りの要素の順序を保つためランキングの順位は崩れない | - |
 
 ---
 
