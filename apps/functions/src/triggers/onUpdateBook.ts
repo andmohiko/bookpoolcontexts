@@ -3,6 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore'
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore'
 import '~/config/firebase'
 import { updateGroupByLabelOperation } from '~/infrastructure/firestore/groups'
+import { removeBookFromRankingOperation } from '~/infrastructure/firestore/rankings'
 import { rebuildSharedGroupBooksOperation } from '~/infrastructure/firestore/sharedGroups'
 import {
   createTagOperation,
@@ -186,6 +187,18 @@ export const onUpdateBook = onDocumentUpdated(
             error,
           )
         }
+      }
+    }
+
+    // ===== ランキングから除去 =====
+    // 読了にした本はランキングの対象外になるため、データからも取り除く
+    // （未読に戻した場合は「ランキング未追加の本」として再び追加できる）
+    if (before.isRead !== true && after.isRead === true) {
+      try {
+        await removeBookFromRankingOperation(uid, bookId)
+        console.log('読了に伴いランキングから除去しました:', bookId)
+      } catch (error) {
+        console.error('ランキングからの除去に失敗:', bookId, error)
       }
     }
   }),

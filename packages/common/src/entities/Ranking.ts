@@ -1,4 +1,5 @@
 import type { FieldValue } from 'firebase/firestore'
+import type { FieldValue as AdminFieldValue } from 'firebase-admin/firestore'
 
 import type { BookId } from './Book'
 
@@ -58,4 +59,12 @@ export type UpdateRankingDto = {
   rankedBookIds?: Ranking['rankedBookIds']
   excludedBookIds?: Ranking['excludedBookIds'] | FieldValue
   updatedAt: FieldValue
+}
+
+/** firebase-admin を使用した更新用DTO */
+export type UpdateRankingDtoFromAdmin = {
+  candidateBookIds?: Ranking['candidateBookIds'] | AdminFieldValue
+  rankedBookIds?: Ranking['rankedBookIds'] | AdminFieldValue
+  excludedBookIds?: Ranking['excludedBookIds'] | AdminFieldValue
+  updatedAt: AdminFieldValue
 }

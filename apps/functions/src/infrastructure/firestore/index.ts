@@ -8,6 +8,10 @@ export {
   updateGroupOperation,
 } from './groups'
 export {
+  removeBookFromRankingOperation,
+  updateRankingOperation,
+} from './rankings'
+export {
   deleteSharedGroupOperation,
   fetchSharedGroupsByGroupIdOperation,
   fetchSharedGroupsByGroupLabelOperation,
