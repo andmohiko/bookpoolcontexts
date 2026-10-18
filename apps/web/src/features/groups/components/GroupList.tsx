@@ -1,24 +1,21 @@
 import { useState } from 'react'
 import type { Group } from '@bookpoolcontexts/common'
-import { FolderOpen, Pencil, Plus, Share2, Trash2 } from 'lucide-react'
+import { FolderOpen, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useGroups } from '@/features/groups/hooks/useGroups'
-import { useSharedGroups } from '@/features/groups/hooks/useSharedGroups'
 import { useDisclosure } from '@/hooks/useDisclosure'
 import { CreateGroupDialog } from '@/features/groups/components/CreateGroupDialog'
 import { EditGroupDialog } from '@/features/groups/components/EditGroupDialog'
 import { DeleteGroupAlertDialog } from '@/features/groups/components/DeleteGroupAlertDialog'
-import { ShareGroupDialog } from '@/features/groups/components/ShareGroupDialog'
+import { ShareGroupButton } from '@/features/groups/components/ShareGroupButton'
 
 export const GroupList = () => {
   const { groups, isLoading } = useGroups()
-  const { sharedGroups } = useSharedGroups()
   const createDisclosure = useDisclosure()
   const editDisclosure = useDisclosure()
   const deleteDisclosure = useDisclosure()
-  const shareDisclosure = useDisclosure()
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null)
 
   const handleEdit = (group: Group): void => {
@@ -29,11 +26,6 @@ export const GroupList = () => {
   const handleDelete = (group: Group): void => {
     setSelectedGroup(group)
     deleteDisclosure.open()
-  }
-
-  const handleShare = (group: Group): void => {
-    setSelectedGroup(group)
-    shareDisclosure.open()
   }
 
   if (isLoading) {
@@ -75,13 +67,7 @@ export const GroupList = () => {
                 <span className="text-sm text-muted-foreground">
                   {group.count}冊
                 </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleShare(group)}
-                >
-                  <Share2 className="h-4 w-4" />
-                </Button>
+                <ShareGroupButton group={group} />
                 <Button
                   variant="ghost"
                   size="sm"
@@ -117,16 +103,6 @@ export const GroupList = () => {
             isOpen={deleteDisclosure.isOpen}
             onClose={deleteDisclosure.close}
             group={selectedGroup}
-          />
-          <ShareGroupDialog
-            isOpen={shareDisclosure.isOpen}
-            onClose={shareDisclosure.close}
-            group={selectedGroup}
-            sharedGroup={
-              sharedGroups.find(
-                (sg) => sg.groupId === selectedGroup.groupId,
-              ) ?? null
-            }
           />
         </>
       )}
