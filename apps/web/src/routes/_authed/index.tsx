@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Plus } from 'lucide-react'
+import { FolderOpen, Plus } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { z } from 'zod'
 import type { Book } from '@bookpoolcontexts/common'
@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { BookEditModal } from '@/features/books/components/BookEditModal'
 import { BookList } from '@/features/books/components/BookList'
 import { BookRegistrationModal } from '@/features/books/components/BookRegistrationModal'
+import { ShareGroupButton } from '@/features/groups/components/ShareGroupButton'
+import { useGroups } from '@/features/groups/hooks/useGroups'
 import { useTags } from '@/features/tags/hooks/useTags'
 import { useDisclosure } from '@/hooks/useDisclosure'
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
@@ -19,9 +21,14 @@ export const Route = createFileRoute('/_authed/')({
 function HomePage() {
   const { tag, group } = Route.useSearch()
   const { tags } = useTags()
+  const { groups } = useGroups()
   const { isOpen: isCreateOpen, open: openCreate, close: closeCreate } = useDisclosure()
   const { isOpen: isEditOpen, open: openEdit, close: closeEdit } = useDisclosure()
   const [selectedBook, setSelectedBook] = useState<Book | null>(null)
+
+  // search param は label のみを持つため、Group entity を label 一致で引き直す。
+  // 同名 label のグループが複数ある場合は最初の 1 件を使う。
+  const selectedGroup = group ? (groups.find((g) => g.label === group) ?? null) : null
 
   useKeyboardShortcut(
     'c',
@@ -56,7 +63,15 @@ function HomePage() {
 
   return (
     <main className="pb-8 pt-4">
-      {!group && (
+      {group ? (
+        <header className="mb-4 flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <FolderOpen className="h-5 w-5 shrink-0 text-muted-foreground" />
+            <h1 className="truncate text-lg font-semibold">{group}</h1>
+          </div>
+          {selectedGroup && <ShareGroupButton group={selectedGroup} />}
+        </header>
+      ) : (
         <nav className="mb-4 flex gap-2 overflow-x-auto">
           <Link
             to="/"

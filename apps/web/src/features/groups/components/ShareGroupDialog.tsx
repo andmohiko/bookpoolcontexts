@@ -33,9 +33,10 @@ export const ShareGroupDialog = ({
     ? `${window.location.origin}/shared/${sharedGroup.sharedGroupId}`
     : ''
 
+  // 発行後はモーダルを閉じない。useSharedGroups の購読で sharedGroup が
+  // 反映され、同じモーダル内がリンクのコピー欄に切り替わる。
   const handleCreate = async (): Promise<void> => {
     await createSharedGroup(group)
-    onClose()
   }
 
   const handleCopyLink = async (): Promise<void> => {
