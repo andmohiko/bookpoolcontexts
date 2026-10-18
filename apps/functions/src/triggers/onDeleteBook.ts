@@ -3,6 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore'
 import { onDocumentDeleted } from 'firebase-functions/v2/firestore'
 import '~/config/firebase'
 import { updateGroupByLabelOperation } from '~/infrastructure/firestore/groups'
+import { removeBookFromRankingOperation } from '~/infrastructure/firestore/rankings'
 import { rebuildSharedGroupBooksOperation } from '~/infrastructure/firestore/sharedGroups'
 import {
   deleteTagOperation,
@@ -87,6 +88,14 @@ export const onDeleteBook = onDocumentDeleted(
           )
         }
       }
+    }
+
+    // ===== ランキングから除去 =====
+    try {
+      await removeBookFromRankingOperation(uid, bookId)
+      console.log('本の削除に伴いランキングから除去しました:', bookId)
+    } catch (error) {
+      console.error('ランキングからの除去に失敗:', bookId, error)
     }
   }),
 )
