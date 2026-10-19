@@ -29,12 +29,12 @@ export const ComparisonCard = ({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex min-w-0 flex-col gap-2">
       <button
         type="button"
         onClick={onSelect}
         disabled={disabled}
-        className="group flex flex-1 cursor-pointer flex-col gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        className="group flex flex-1 cursor-pointer flex-col gap-2 rounded-lg border p-2 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:gap-3 sm:p-3"
       >
         <div className="flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded-md bg-muted">
           {scrapingStatus === 'scraping' ? (
@@ -80,10 +80,12 @@ export const ComparisonCard = ({
         size="sm"
         onClick={handleExclude}
         disabled={disabled}
+        aria-label="ランキングに含めない"
         className="text-muted-foreground"
       >
         <EyeOff className="size-4" />
-        ランキングに含めない
+        {/* 狭い画面では2列に収まらないためアイコンのみにする */}
+        <span className="hidden sm:inline">ランキングに含めない</span>
       </Button>
     </div>
   )
