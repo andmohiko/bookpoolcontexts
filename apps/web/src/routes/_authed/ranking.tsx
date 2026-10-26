@@ -257,7 +257,11 @@ function RankingPage() {
       )}
 
       <div className="flex flex-col gap-4">
-        <RankingList books={rankedBooks} />
+        <RankingList
+          books={rankedBooks}
+          ranking={ranking}
+          canExclude={!isSorting}
+        />
         <PendingBooksNotice
           pendingBooks={pendingBooks}
           duplicateBooks={duplicateBooks}
