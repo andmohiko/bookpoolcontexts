@@ -506,14 +506,17 @@ firebase-js-sdk の `arrayUnion` は `valueEquals` による深い等価比較�
 
 | 項目 | 内容 |
 |------|------|
-| 概要 | ランキング表示の本から除外・読了の操作を行う |
+| 概要 | ランキング表示の本から除外・読了・単品のソートし直しの操作を行う |
 | 優先度 | 必須 |
 
 **詳細要件:**
-- ランキング表示（状態 C）のリストの本をタップするとアクションモーダルを開く。モーダルには表紙・タイトル・著者と「読了にする」「ランキングから除外」を並べる
+- ランキング表示（状態 C）のリストの本をタップするとアクションモーダルを開く。モーダルには表紙・タイトル・著者と「ソートし直す」「読了にする」「ランキングから除外」を並べる
 - 「読了にする」は本の `isRead` を `true` に更新する。ランキングの各配列からの除去は `onUpdateBook` トリガーが行う（4.7 参照）ため、クライアントは `isRead` のみを更新する
 - 「ランキングから除外」は確認ダイアログを挟んでから除外する。除外の挙動は FR-RANK-003 と同じで、`excludedBookIds` に追加し `rankedBookIds` から取り除く永続的な除外である
-- ソート進行中（`status === 'sorting'`）は除外ボタンを無効化する。理由は FR-RANK-003 の除外解除と同じで、進捗が巻き戻って見えるため
+- 「ソートし直す」は、その本だけを `rankedBookIds` から取り除く。永続的な除外ではないため `excludedBookIds` には追加せず、新しく登録した本と同じく「ランキング未追加の本」に戻る。そこから「ランキングを更新」の二分挿入ソート（FR-RANK-002）で順位を決め直す
+  - 専用のソートを開始しないのは、「未追加の本を既存ランキングへ二分挿入する」という既存の更新フローと必要な処理が同一で、入口を分ける理由がないため。最大比較回数も既存ランキング n 冊に対し `⌈log₂(n)⌉` で同じ
+  - 確認ダイアログは挟まない。永続的な影響がなく、取り消したい場合は「ランキングを更新」で元の位置を選び直せる
+- ソート進行中（`status === 'sorting'`）は「ソートし直す」「ランキングから除外」を無効化する。理由は FR-RANK-003 の除外解除と同じで、進捗が巻き戻って見えるため（「ソートし直す」は進行中のソートが前提にしている既存ランキングが変わってしまうため）
 - 本の内容そのものの編集・削除はこのモーダルでは提供しない（本の一覧の編集モーダルで行う）
 - アクションモーダルを開けるのはランキング表示のリストのみ。「ランキング未追加の本」「除外した本」セクションの本はタップ対象にしない
 
@@ -1483,7 +1486,7 @@ bookpoolcontexts/
 │   │       │   ├── groups/                  # GroupList, GroupCheckboxList, GroupSelectDropdown, CreateGroupDialog, EditGroupDialog, DeleteGroupAlertDialog, ShareGroupDialog, useGroups
 │   │       │   ├── ranking/
 │   │       │   │   ├── components/        # ComparisonView, ComparisonCard, SortProgressBar, RankingList, RankingListItem, UnrankedBooksSection, ExcludedBooksSection, RankingEmptyState, RebuildRankingAlertDialog, DiscardSortAlertDialog, RankingBookActionModal, ExcludeFromRankingAlertDialog
-│   │       │   │   ├── hooks/              # useRanking, useUnreadBooks, useRankingProgress, useStartRankingMutation, useAnswerComparisonMutation, useUndoComparisonMutation, useExcludeBookMutation, useUnexcludeBookMutation, useDiscardSortMutation, useMarkBookAsReadMutation
+│   │       │   │   ├── hooks/              # useRanking, useUnreadBooks, useRankingProgress, useStartRankingMutation, useAnswerComparisonMutation, useUndoComparisonMutation, useExcludeBookMutation, useUnexcludeBookMutation, useDiscardSortMutation, useMarkBookAsReadMutation, useRemoveFromRankingMutation
 │   │       │   │   └── utils/              # sortEngine（マージソート / 二分挿入の純粋関数）+ sortEngine.test.ts
 │   │       │   ├── shared/                  # SharedBookList, SharedBookCard, SharedGroupHeader, useSharedGroup
 │   │       │   └── tags/                    # TagList, TagSuggestionDropdown, EditTagDialog, DeleteTagAlertDialog, useTags, useRecentTags
@@ -1744,6 +1747,7 @@ VITE_FIREBASE_APP_ID=xxx
 | 2026-09-24 | 1.4 | 実態との乖離を修正。開発ツールを ESLint+Prettier → Biome に変更、Turborepo・tsup・dayjs・express-validator を追記、Functions ランタイムを Node.js 22 に明記、Firestore ルールの sharedGroups を実態（クライアント create/delete 可能）に修正、`normalizeTagLabel` の説明を Unicode NFC 正規化に修正、ファイル構成に `onUpdateGroup.ts`・`ogp.ts`・`convertDate.ts`・`array.ts`・`errorMessage.ts`・`GroupCheckboxList`・`useRecentTags` 等を追加、未実装の `api/sharedGroups/` を削除 | - |
 | 2026-10-14 | 1.5 | 読みたい本ランキング機能（FR-RANK-001〜003）を追加。`rankings` サブコレクション（ドキュメントID固定 `current`）、回答ログ + 再計算方式のソートエンジン（create はマージソート、update は二分挿入）、SCR-008 ランキング画面、`features/ranking/`（コンポーネント 10 / フック 9 / sortEngine + Vitest テスト 33 件）、`subscribeUnreadBooksOperation`、Firestore セキュリティルール追加。`arrayUnion` の深い重複排除に対応し回答と確定を 1 回の `updateDoc` にまとめる設計、update の最大比較回数を累積和 `Σ⌈log₂(n+i)⌉` に修正、除外解除は `idle` 時のみ許可 | - |
 | 2026-10-16 | 1.6 | 読了・削除した本をランキングのデータからも取り除くようにした（Issue #3）。`onUpdateBook`（`isRead` が `true` に変化）と `onDeleteBook` に `rankings/current` の同期処理を追加し、`UpdateRankingDtoFromAdmin` と `apps/functions` 側の rankings Operations を新設。`FieldValue.arrayRemove` は残りの要素の順序を保つためランキングの順位は崩れない | - |
+| 2026-11-06 | 1.7 | ランキングの本を 1 冊だけソートし直せるようにした（FR-RANK-004）。アクションモーダルに「ソートし直す」を追加し、`useRemoveFromRankingMutation` で `rankedBookIds` から当該 ID のみを取り除く。永続除外（`excludedBookIds`）とは別扱いで、取り除いた本は「ランキング未追加の本」に戻り既存の「ランキングを更新」の二分挿入ソートで順位を決め直す。専用のソート経路を作らないのは更新フローと処理が同一のため | - |
 
 ---
 

@@ -1,5 +1,5 @@
 import type { Book, Ranking } from '@bookpoolcontexts/common'
-import { BookOpenCheck, Ban } from 'lucide-react'
+import { ArrowDownUp, Ban, BookOpenCheck } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { ExcludeFromRankingAlertDialog } from '@/features/ranking/components/ExcludeFromRankingAlertDialog'
 import { useMarkBookAsReadMutation } from '@/features/ranking/hooks/useMarkBookAsReadMutation'
+import { useRemoveFromRankingMutation } from '@/features/ranking/hooks/useRemoveFromRankingMutation'
 import { useDisclosure } from '@/hooks/useDisclosure'
 
 type RankingBookActionModalProps = {
@@ -19,14 +20,14 @@ type RankingBookActionModalProps = {
   book: Book
   rank: number
   ranking: Ranking | null
-  /** ソート進行中は除外できない（進捗が巻き戻って見えるため） */
+  /** ソート進行中は除外・ソートし直しができない（進捗が巻き戻って見えるため） */
   canExclude: boolean
 }
 
 /**
  * ランキングの本をクリックしたときのアクションモーダル。
  *
- * ランキングからの除外と読了の2操作のみを提供する。
+ * ランキングからの除外・読了・単品のソートし直しを提供する。
  * 本の内容の編集は本の一覧（BookEditModal）で行う。
  */
 export const RankingBookActionModal = ({
@@ -38,11 +39,22 @@ export const RankingBookActionModal = ({
   canExclude,
 }: RankingBookActionModalProps) => {
   const { markAsRead, isMarking } = useMarkBookAsReadMutation()
+  const { removeFromRanking, isRemoving } =
+    useRemoveFromRankingMutation(ranking)
   const excludeDisclosure = useDisclosure()
 
   const handleMarkAsRead = async (): Promise<void> => {
     try {
       await markAsRead(book.bookId)
+      onClose()
+    } catch {
+      // トースト通知はフック内で行うため握りつぶす
+    }
+  }
+
+  const handleResort = async (): Promise<void> => {
+    try {
+      await removeFromRanking(book.bookId)
       onClose()
     } catch {
       // トースト通知はフック内で行うため握りつぶす
@@ -84,6 +96,19 @@ export const RankingBookActionModal = ({
           <Button
             type="button"
             variant="outline"
+            onClick={() => void handleResort()}
+            disabled={!canExclude || isRemoving}
+          >
+            <ArrowDownUp className="size-4" />
+            {isRemoving ? '更新中...' : 'ソートし直す'}
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            この本をランキングから外し、「ランキング未追加の本」に戻します。
+            「ランキングを更新」で順位を決め直せます。
+          </p>
+          <Button
+            type="button"
+            variant="outline"
             onClick={() => void handleMarkAsRead()}
             disabled={isMarking}
           >
@@ -102,7 +127,7 @@ export const RankingBookActionModal = ({
           </Button>
           {!canExclude && (
             <p className="text-xs text-muted-foreground">
-              ソート中は除外できません。ソートを完了または破棄してください。
+              ソート中はソートし直し・除外ができません。ソートを完了または破棄してください。
             </p>
           )}
         </div>
