@@ -495,11 +495,27 @@ FR-LIST-004 を参照。
 - 除外は永続的で、作り直し・更新のいずれでも対象外になる
 - ランキング画面の「除外した本」セクションから除外を解除できる。解除した本は「ランキング未追加の本」に戻る
 - 除外解除は `status === 'idle'` のときのみ可能。ソート進行中は解除ボタンを無効化する（解除するとその本に関する比較が改めて要求され、進捗が巻き戻って見えるため）
-- ランキング表示から個別の本を除外する操作、順位の手動変更は提供しない
+- ランキング表示のリストから個別の本を除外できる。本をタップするとアクションモーダルが開き、「ランキングから除外」を押すと確認ダイアログを経て除外される（FR-RANK-004）
+- 順位の手動変更は提供しない
 
 **実装上の注意（`arrayUnion` の重複排除）:**
 
 firebase-js-sdk の `arrayUnion` は `valueEquals` による深い等価比較で重複を排除するため、`{ winner, loser }` は配列内に 1 つしか入らない。このため回答の記録は冪等である一方、`onSnapshot` の到着を待って確定処理を呼ぶ設計にすると、スナップショット到着前の再回答が無視され進捗が止まる。回答と確定は 1 回の `updateDoc` にまとめる。
+
+#### FR-RANK-004: ランキングの本へのアクション
+
+| 項目 | 内容 |
+|------|------|
+| 概要 | ランキング表示の本から除外・読了の操作を行う |
+| 優先度 | 必須 |
+
+**詳細要件:**
+- ランキング表示（状態 C）のリストの本をタップするとアクションモーダルを開く。モーダルには表紙・タイトル・著者と「読了にする」「ランキングから除外」を並べる
+- 「読了にする」は本の `isRead` を `true` に更新する。ランキングの各配列からの除去は `onUpdateBook` トリガーが行う（4.7 参照）ため、クライアントは `isRead` のみを更新する
+- 「ランキングから除外」は確認ダイアログを挟んでから除外する。除外の挙動は FR-RANK-003 と同じで、`excludedBookIds` に追加し `rankedBookIds` から取り除く永続的な除外である
+- ソート進行中（`status === 'sorting'`）は除外ボタンを無効化する。理由は FR-RANK-003 の除外解除と同じで、進捗が巻き戻って見えるため
+- 本の内容そのものの編集・削除はこのモーダルでは提供しない（本の一覧の編集モーダルで行う）
+- アクションモーダルを開けるのはランキング表示のリストのみ。「ランキング未追加の本」「除外した本」セクションの本はタップ対象にしない
 
 ---
 
@@ -1202,11 +1218,29 @@ export type UpdateRankingDtoFromAdmin = {
 - 読了・削除された本はリストに出さない
 - 「作り直す」は確認ダイアログを表示する
 - 折りたたみセクションは `details` / `summary` で実装する
+- ランキングリストの各行は全体がボタン。タップするとアクションモーダルを開く（FR-RANK-004）
+
+**アクションモーダル（ランキングの本をタップ）**
+
+```
+┌──────────────────────────┐
+│  ランキング 1 位の本      │
+│  📕  タイトル            │
+│      著者                │
+│  [読了にする]            │
+│  [ランキングから除外]    │
+│           [閉じる]       │
+└──────────────────────────┘
+```
+
+- 「ランキングから除外」は確認ダイアログ（`ExcludeFromRankingAlertDialog`）を重ねて表示する
+- ソート中は「ランキングから除外」を無効化し、理由を文言で添える
 
 **コンポーネント:**
 - `RankingEmptyState`
 - `ComparisonView` / `ComparisonCard` / `SortProgressBar`
 - `RankingList` / `RankingListItem`
+- `RankingBookActionModal` / `ExcludeFromRankingAlertDialog`
 - `UnrankedBooksSection` / `ExcludedBooksSection`
 - `RebuildRankingAlertDialog` / `DiscardSortAlertDialog`（いずれも `Dialog` ベース）
 
@@ -1360,6 +1394,7 @@ export type UpdateRankingDtoFromAdmin = {
 | 2択の回答 | `useAnswerComparisonMutation` | 次の進捗をローカル計算し、完了なら回答と確定を 1 回の `updateDoc` にまとめる |
 | 1つ戻る | `useUndoComparisonMutation` | `decisions` の末尾を `arrayRemove` |
 | 除外／除外解除 | `useExcludeBookMutation` / `useUnexcludeBookMutation` | 解除は `status === 'idle'` のときのみ |
+| 読了にする | `useMarkBookAsReadMutation` | `isRead` のみを更新。ランキング配列からの除去は `onUpdateBook` に任せる |
 | ソート破棄 | `useDiscardSortMutation` | `rankedBookIds` は保持する |
 
 **ソートエンジン（`features/ranking/utils/sortEngine.ts`）:**
@@ -1447,8 +1482,8 @@ bookpoolcontexts/
 │   │       │   │   └── utils/              # parseAmazonHtml
 │   │       │   ├── groups/                  # GroupList, GroupCheckboxList, GroupSelectDropdown, CreateGroupDialog, EditGroupDialog, DeleteGroupAlertDialog, ShareGroupDialog, useGroups
 │   │       │   ├── ranking/
-│   │       │   │   ├── components/        # ComparisonView, ComparisonCard, SortProgressBar, RankingList, RankingListItem, UnrankedBooksSection, ExcludedBooksSection, RankingEmptyState, RebuildRankingAlertDialog, DiscardSortAlertDialog
-│   │       │   │   ├── hooks/              # useRanking, useUnreadBooks, useRankingProgress, useStartRankingMutation, useAnswerComparisonMutation, useUndoComparisonMutation, useExcludeBookMutation, useUnexcludeBookMutation, useDiscardSortMutation
+│   │       │   │   ├── components/        # ComparisonView, ComparisonCard, SortProgressBar, RankingList, RankingListItem, UnrankedBooksSection, ExcludedBooksSection, RankingEmptyState, RebuildRankingAlertDialog, DiscardSortAlertDialog, RankingBookActionModal, ExcludeFromRankingAlertDialog
+│   │       │   │   ├── hooks/              # useRanking, useUnreadBooks, useRankingProgress, useStartRankingMutation, useAnswerComparisonMutation, useUndoComparisonMutation, useExcludeBookMutation, useUnexcludeBookMutation, useDiscardSortMutation, useMarkBookAsReadMutation
 │   │       │   │   └── utils/              # sortEngine（マージソート / 二分挿入の純粋関数）+ sortEngine.test.ts
 │   │       │   ├── shared/                  # SharedBookList, SharedBookCard, SharedGroupHeader, useSharedGroup
 │   │       │   └── tags/                    # TagList, TagSuggestionDropdown, EditTagDialog, DeleteTagAlertDialog, useTags, useRecentTags
