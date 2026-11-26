@@ -80,13 +80,18 @@ export const RankingBookActionModal = ({
               <span className="text-xs text-muted-foreground">No Image</span>
             )}
           </div>
-          <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex min-w-0 flex-col gap-0.5">
             <span className="text-sm font-medium">
               {book.title ?? 'タイトル未取得'}
             </span>
             {book.author && (
               <span className="text-xs text-muted-foreground">
                 {book.author}
+              </span>
+            )}
+            {book.pages !== null && (
+              <span className="text-xs text-muted-foreground">
+                {book.pages.toString()}ページ
               </span>
             )}
           </div>

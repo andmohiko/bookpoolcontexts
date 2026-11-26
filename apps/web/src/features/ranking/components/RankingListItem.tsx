@@ -36,9 +36,11 @@ export const RankingListItem = ({
           <span className="line-clamp-2 text-sm font-medium">
             {book.title ?? 'タイトル未取得'}
           </span>
-          {book.author && (
+          {(book.author || book.pages !== null) && (
             <span className="line-clamp-1 text-xs text-muted-foreground">
-              {book.author}
+              {[book.author, book.pages !== null && `${book.pages.toString()}ページ`]
+                .filter(Boolean)
+                .join(' · ')}
             </span>
           )}
         </div>

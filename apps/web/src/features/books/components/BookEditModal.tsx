@@ -141,12 +141,19 @@ export const BookEditModal = ({
               </div>
             )}
 
-            {book.title && (
-              <p className="text-center text-sm font-medium">{book.title}</p>
-            )}
-            {book.author && (
-              <p className="text-center text-xs text-muted-foreground">{book.author}</p>
-            )}
+            <div className="flex flex-col gap-1">
+              {book.title && (
+                <p className="text-center text-sm font-medium">{book.title}</p>
+              )}
+              {book.author && (
+                <p className="text-center text-xs text-muted-foreground">{book.author}</p>
+              )}
+              {book.pages !== null && (
+                <p className="text-center text-xs text-muted-foreground">
+                  {book.pages.toString()}ページ
+                </p>
+              )}
+            </div>
 
             <div className="space-y-2">
               <Label>タグ</Label>
